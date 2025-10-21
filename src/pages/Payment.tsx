@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,10 @@ import {
   ContactRound,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { clientOrderService } from "@/services/client/client-order.service";
+import { ClientOrderItem } from "@/models/client/client-order-item.model";
+import { CartItem } from "@/redux/slices/cartSlice";
+import { clearCart } from "@/redux/slices/cartSlice";
 
 type PaymentMethod = "card" | "mobile" | "cash" | "gift" | "contactless";
 
@@ -25,10 +30,12 @@ const Payment = () => {
     tax: 0,
   };
 
+  const dispatch = useDispatch();
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(
     null
   );
   const [cashReceived, setCashReceived] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Get payment details from navigation state
 
@@ -44,7 +51,7 @@ const Payment = () => {
     { id: "gift" as PaymentMethod, label: "Carte cadeau", icon: Gift },
   ];
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     if (!selectedMethod) {
       toast({
         title: "Erreur",
@@ -63,49 +70,116 @@ const Payment = () => {
       return;
     }
 
-    // Save sale to session
+    // Get current session from localStorage
     const currentSession = JSON.parse(
       localStorage.getItem("currentSession") || "{}"
     );
-    const sale = {
-      id: Date.now().toString().slice(-6),
-      date: new Date().toISOString(),
-      items: location.state.cart || [],
-      subtotal,
-      tax,
-      total,
-      paymentMethod:
-        selectedMethod === "card"
-          ? "Carte"
-          : selectedMethod === "mobile"
-          ? "Mobile"
-          : selectedMethod === "cash"
-          ? "Espèces"
-          : selectedMethod === "contactless"
-          ? "Sans contact"
-          : "Carte cadeau",
-    };
 
-    if (!currentSession.sales) currentSession.sales = [];
-    currentSession.sales.push(sale);
-    currentSession.totalSales = (currentSession.totalSales || 0) + total;
-
-    if (selectedMethod === "cash") {
-      currentSession.totalCash = (currentSession.totalCash || 0) + total;
-    } else if (selectedMethod === "card" || selectedMethod === "contactless") {
-      currentSession.totalCard = (currentSession.totalCard || 0) + total;
+    if (!currentSession.id) {
+      toast({
+        title: "Erreur",
+        description: "Session de caisse non trouvée",
+        variant: "destructive",
+      });
+      return;
     }
 
-    localStorage.setItem("currentSession", JSON.stringify(currentSession));
+    setIsProcessing(true);
 
-    toast({
-      title: "Paiement réussi",
-      description: `Ticket #${sale.id} - ${total.toFixed(2)} €`,
-    });
+    try {
+      // Convert cart items to order items
+      const cartItems: CartItem[] = location.state.cart || [];
+      const orderItems: ClientOrderItem[] = cartItems.map((item) => ({
+        productId: item.itemId,
+        productName: item.itemTitle,
+        unitPrice: item.itemPrice,
+        quantity: item.itemQuantity,
+        mediasUrls: item.itemImage ? [item.itemImage] : [],
+        options: item.itemOptions?.map((opt) => ({
+          optionId: opt.optionId,
+          optionName: opt.optionName,
+          optionPrice: opt.optionPrice || 0,
+        })),
+        totalPrice: item.itemTotalPrice,
+      }));
 
-    setTimeout(() => {
-      navigate("/pos");
-    }, 1500);
+      // Prepare order data
+      const orderData = {
+        orderItems,
+        total,
+        subTotal: subtotal,
+      };
+
+      // Calculate cash received and change for cash payments
+      const cashReceivedAmount =
+        selectedMethod === "cash" ? parseFloat(cashReceived) : undefined;
+      const changeGivenAmount =
+        selectedMethod === "cash" ? parseFloat(cashReceived) - total : undefined;
+
+      // Place the order using the backend service
+      const createdOrder = await clientOrderService.placePOSOrder(
+        orderData,
+        currentSession.id,
+        cashReceivedAmount,
+        changeGivenAmount
+      );
+
+      // Update local session data for UI tracking
+      const sale = {
+        id: createdOrder.orderNumber || createdOrder.id || Date.now().toString().slice(-6),
+        date: createdOrder.createdAt || new Date().toISOString(),
+        items: cartItems,
+        subtotal,
+        tax,
+        total,
+        paymentMethod:
+          selectedMethod === "card"
+            ? "Carte"
+            : selectedMethod === "mobile"
+            ? "Mobile"
+            : selectedMethod === "cash"
+            ? "Espèces"
+            : selectedMethod === "contactless"
+            ? "Sans contact"
+            : "Carte cadeau",
+      };
+
+      if (!currentSession.sales) currentSession.sales = [];
+      currentSession.sales.push(sale);
+      currentSession.totalSales = (currentSession.totalSales || 0) + total;
+
+      if (selectedMethod === "cash") {
+        currentSession.totalCash = (currentSession.totalCash || 0) + total;
+      } else if (selectedMethod === "card" || selectedMethod === "contactless") {
+        currentSession.totalCard = (currentSession.totalCard || 0) + total;
+      }
+
+      localStorage.setItem("currentSession", JSON.stringify(currentSession));
+
+      // Clear the cart after successful order
+      dispatch(clearCart());
+
+      toast({
+        title: "Paiement réussi",
+        description: `Commande #${sale.id} - ${total.toFixed(2)} €`,
+      });
+
+      setTimeout(() => {
+        navigate("/pos");
+      }, 1500);
+    } catch (error: any) {
+      console.error("Error placing order:", error);
+      toast({
+        title: "Erreur de paiement",
+        description:
+          error.response?.data?.message ||
+          error.message ||
+          "Impossible de traiter le paiement. Veuillez réessayer.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const change =
@@ -218,9 +292,9 @@ const Payment = () => {
               size="lg"
               className="mt-6 w-full"
               onClick={handlePayment}
-              disabled={!selectedMethod}
+              disabled={!selectedMethod || isProcessing}
             >
-              Ajouter paiement - {total.toFixed(2)} €
+              {isProcessing ? "Traitement..." : `Ajouter paiement - ${total.toFixed(2)} €`}
             </Button>
           </Card>
         </div>

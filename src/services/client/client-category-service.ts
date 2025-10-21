@@ -1,6 +1,5 @@
-import { API_BASE_URL } from "@/lib/api.config";
+import { apiClient } from "@/lib/api.config";
 import { ClientCategory } from "@/models/client/client-category-model";
-import axios from "axios";
 
 export const clientCategoryService = {
   /**
@@ -9,7 +8,7 @@ export const clientCategoryService = {
    * @returns Array of ClientCategory
    */
   async getAll(): Promise<ClientCategory[]> {
-    const { data } = await axios.get(`${API_BASE_URL}/client/categories`);
+    const { data } = await apiClient.get("/client/categories");
     return data;
   },
 
@@ -20,7 +19,7 @@ export const clientCategoryService = {
    * @returns ClientCategory
    */
   async getById(id: string): Promise<ClientCategory> {
-    const { data } = await axios.get(`${API_BASE_URL}/client/categories/${id}`);
+    const { data } = await apiClient.get(`/client/categories/${id}`);
     return data;
   },
 };

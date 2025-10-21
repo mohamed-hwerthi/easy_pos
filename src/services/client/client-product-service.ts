@@ -1,7 +1,6 @@
-import { API_BASE_URL } from "@/lib/api.config";
+import { apiClient } from "@/lib/api.config";
 import { ClientProduct } from "@/models/client/client-product-detail-model";
 import { PaginatedResponse } from "@/models/paginationResponse";
-import axios from "axios";
 
 export const clientProductService = {
   /**
@@ -20,9 +19,7 @@ export const clientProductService = {
       priceSortDirection?: string;
     } = {}
   ): Promise<PaginatedResponse<ClientProduct>> {
-    const { data } = await axios.get(`${API_BASE_URL}/client/products`, {
-      params,
-    });
+    const { data } = await apiClient.get("/client/products", { params });
     return data;
   },
 
@@ -32,7 +29,7 @@ export const clientProductService = {
    * @returns ClientProduct with detailed product information
    */
   async getById(id: string): Promise<ClientProduct> {
-    const { data } = await axios.get(`${API_BASE_URL}/client/products/${id}`);
+    const { data } = await apiClient.get(`/client/products/${id}`);
     return data;
   },
   /**
@@ -41,8 +38,8 @@ export const clientProductService = {
    * @returns Array of ClientProduct
    */
   async getByCategory(categoryId: string): Promise<ClientProduct[]> {
-    const { data } = await axios.get(
-      `${API_BASE_URL}/client/products/by-category/${categoryId}`
+    const { data } = await apiClient.get(
+      `/client/products/by-category/${categoryId}`
     );
     return data;
   },

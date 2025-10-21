@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -7,13 +7,50 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, DollarSign } from "lucide-react";
 import { cashierSessionService } from "@/services/cahier-session.service";
+import { userService } from "@/services/user.service";
+import { UserDTO } from "@/models/user.model";
 
 const CashRegisterOpening = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [initialAmount, setInitialAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const cashier = JSON.parse(localStorage.getItem("cashier") || "{}");
+  const [currentUser, setCurrentUser] = useState<UserDTO | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+
+  // Fetch current user on component mount
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const user = await userService.getCurrentUser();
+        setCurrentUser(user);
+        // Update localStorage with current user info
+        localStorage.setItem(
+          "cashier",
+          JSON.stringify({
+            id: user.id,
+            name: user.firstName && user.lastName 
+              ? `${user.firstName} ${user.lastName}` 
+              : user.email.split("@")[0],
+            email: user.email,
+            role: user.role,
+          })
+        );
+      } catch (error: any) {
+        console.error("Error fetching current user:", error);
+        toast({
+          title: "Erreur",
+          description: "Impossible de récupérer les informations de l'utilisateur",
+          variant: "destructive",
+        });
+        navigate("/login");
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+
+    fetchCurrentUser();
+  }, [navigate, toast]);
 
   const handleOpenRegister = async () => {
     if (!initialAmount || parseFloat(initialAmount) < 0) {
@@ -25,7 +62,7 @@ const CashRegisterOpening = () => {
       return;
     }
 
-    if (!cashier.id) {
+    if (!currentUser?.id) {
       toast({
         title: "Erreur",
         description: "Informations du caissier manquantes",
@@ -40,7 +77,7 @@ const CashRegisterOpening = () => {
     try {
       // Create session on the backend
       const sessionResponse = await cashierSessionService.createSession({
-        cashierId: cashier.id,
+        cashierId: currentUser.id,
         openingBalance: parseFloat(initialAmount),
         isClosed: false,
       });
@@ -49,8 +86,10 @@ const CashRegisterOpening = () => {
       const session = {
         id: sessionResponse.id,
         sessionNumber: sessionResponse.sessionNumber,
-        cashier: cashier.name,
-        cashierId: cashier.id,
+        cashier: currentUser.firstName && currentUser.lastName
+          ? `${currentUser.firstName} ${currentUser.lastName}`
+          : currentUser.email.split("@")[0],
+        cashierId: currentUser.id,
         openedAt: sessionResponse.startTime,
         initialAmount: sessionResponse.openingBalance,
         totalSales: sessionResponse.totalSales,
@@ -83,13 +122,29 @@ const CashRegisterOpening = () => {
     }
   };
 
+  if (isLoadingUser) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <Card className="w-full max-w-md p-8">
+          <div className="text-center">
+            <p className="text-muted-foreground">Chargement...</p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <Card className="w-full max-w-md p-8">
         <div className="mb-6 text-center">
           <DollarSign className="h-16 w-16 mx-auto mb-4 text-primary" />
           <h1 className="text-3xl font-bold mb-2">Ouverture de caisse</h1>
-          <p className="text-muted-foreground">Bienvenue {cashier.name}</p>
+          <p className="text-muted-foreground">
+            Bienvenue {currentUser?.firstName && currentUser?.lastName
+              ? `${currentUser.firstName} ${currentUser.lastName}`
+              : currentUser?.email.split("@")[0]}
+          </p>
           <p className="text-sm text-muted-foreground">
             {new Date().toLocaleDateString("fr-FR", {
               weekday: "long",

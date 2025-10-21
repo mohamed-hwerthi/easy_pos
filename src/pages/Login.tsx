@@ -41,8 +41,8 @@ const Login = () => {
       localStorage.setItem(
         "cashier",
         JSON.stringify({
-          id: authResponse.storeId, // Using storeId as cashier ID
-          name: email.split('@')[0], // Extract name from email
+          id: authResponse.storeId,
+          name: email.split("@")[0],
           email,
           role: authResponse.role,
           storeId: authResponse.storeId,

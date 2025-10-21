@@ -82,13 +82,12 @@ const POS = () => {
     setSession(JSON.parse(currentSession));
   }, [navigate]);
 
-  // Fetch products from API
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setIsLoadingProducts(true);
         const response = await clientProductService.getAll({
-          limit: 100, // Get more products for POS
+          limit: 100,
         });
         const convertedProducts = response.items.map(
           convertClientProductToProduct

@@ -1,9 +1,8 @@
-import { API_BASE_URL } from "@/lib/api.config";
+import { apiClient } from "@/lib/api.config";
 import {
   CashierSessionRequestDTO,
   CashierSessionResponseDTO,
 } from "@/models/cashier-session.model";
-import axios from "axios";
 
 /**
  * Service for interacting with CashierSessionController
@@ -16,11 +15,7 @@ export const cashierSessionService = {
   async createSession(
     payload: CashierSessionRequestDTO
   ): Promise<CashierSessionResponseDTO> {
-    const { data } = await axios.post(
-      `${API_BASE_URL}/api/cashier-sessions`,
-      payload,
-      { withCredentials: true }
-    );
+    const { data } = await apiClient.post("/cashier-sessions", payload);
     return data;
   },
 
@@ -32,11 +27,7 @@ export const cashierSessionService = {
     id: string,
     payload: CashierSessionRequestDTO
   ): Promise<CashierSessionResponseDTO> {
-    const { data } = await axios.put(
-      `${API_BASE_URL}/api/cashier-sessions/${id}`,
-      payload,
-      { withCredentials: true }
-    );
+    const { data } = await apiClient.put(`/cashier-sessions/${id}`, payload);
     return data;
   },
 
@@ -57,10 +48,10 @@ export const cashierSessionService = {
     id: string,
     closingBalance: number
   ): Promise<CashierSessionResponseDTO> {
-    const { data } = await axios.post(
-      `${API_BASE_URL}/api/cashier-sessions/${id}/close`,
+    const { data } = await apiClient.post(
+      `/cashier-sessions/${id}/close`,
       null,
-      { params: { closingBalance }, withCredentials: true }
+      { params: { closingBalance } }
     );
     return data;
   },
@@ -70,9 +61,7 @@ export const cashierSessionService = {
    * GET /api/cashier-sessions
    */
   async getAllSessions(): Promise<CashierSessionResponseDTO[]> {
-    const { data } = await axios.get(`${API_BASE_URL}/api/cashier-sessions`, {
-      withCredentials: true,
-    });
+    const { data } = await apiClient.get("/cashier-sessions");
     return data;
   },
 
@@ -81,10 +70,7 @@ export const cashierSessionService = {
    * GET /api/cashier-sessions/{id}
    */
   async getSessionById(id: string): Promise<CashierSessionResponseDTO> {
-    const { data } = await axios.get(
-      `${API_BASE_URL}/api/cashier-sessions/${id}`,
-      { withCredentials: true }
-    );
+    const { data } = await apiClient.get(`/cashier-sessions/${id}`);
     return data;
   },
 
@@ -95,10 +81,7 @@ export const cashierSessionService = {
   async getSessionsByCashier(
     cashierId: string
   ): Promise<CashierSessionResponseDTO[]> {
-    const { data } = await axios.get(
-      `${API_BASE_URL}/api/cashier-sessions/cashier/${cashierId}`,
-      { withCredentials: true }
-    );
+    const { data } = await apiClient.get(`/cashier-sessions/cashier/${cashierId}`);
     return data;
   },
 
@@ -109,10 +92,7 @@ export const cashierSessionService = {
   async getSessionsByStatus(
     isClosed: boolean
   ): Promise<CashierSessionResponseDTO[]> {
-    const { data } = await axios.get(
-      `${API_BASE_URL}/api/cashier-sessions/status/${isClosed}`,
-      { withCredentials: true }
-    );
+    const { data } = await apiClient.get(`/cashier-sessions/status/${isClosed}`);
     return data;
   },
 
@@ -121,8 +101,6 @@ export const cashierSessionService = {
    * DELETE /api/cashier-sessions/{id}
    */
   async deleteSession(id: string): Promise<void> {
-    await axios.delete(`${API_BASE_URL}/api/cashier-sessions/${id}`, {
-      withCredentials: true,
-    });
+    await apiClient.delete(`/cashier-sessions/${id}`);
   },
 };

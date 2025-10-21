@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/lib/api.config";
+import { API_BASE_URL, apiClient } from "@/lib/api.config";
 import { AuthResponse } from "@/models/auth-response.model";
 import axios from "axios";
 
@@ -18,29 +18,19 @@ export const authService = {
 
   // Logout
   async logout(): Promise<any> {
-    const { data } = await axios.post(
-      `${API_BASE_URL}/auth/logout`,
-      {},
-      { withCredentials: true }
-    );
+    const { data } = await apiClient.post("/auth/logout", {});
     return data;
   },
 
   // Get Current User
   async getCurrentUser(): Promise<any> {
-    const { data } = await axios.get(`${API_BASE_URL}/auth/current-user`, {
-      withCredentials: true,
-    });
+    const { data } = await apiClient.get("/auth/current-user");
     return data;
   },
 
   // Token Refresh
   async refreshToken(): Promise<any> {
-    const { data } = await axios.post(
-      `${API_BASE_URL}/token/refresh-token`,
-      {},
-      { withCredentials: true }
-    );
+    const { data } = await apiClient.post("/token/refresh-token", {});
     return data;
   },
 };
