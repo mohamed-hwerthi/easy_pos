@@ -1,15 +1,15 @@
 export interface CashierSessionResponse {
-  id: string; // UUID as string
+  id: string;
   sessionNumber: string;
-  startTime: string; // ISO string
-  endTime?: string; // ISO string
+  startTime: string;
+  endTime?: string;
   openingBalance: number;
   closingBalance?: number;
   totalSales: number;
   totalRefunds: number;
   isClosed: boolean;
-  cashierId: string; // UUID as string
+  cashierId: string;
   cashierName: string;
-  orderIds: string[]; // Array of UUIDs as strings
-  cashMovementIds: string[]; // Array of UUIDs as strings
+  orderIds: string[];
+  cashMovementIds: string[];
 }

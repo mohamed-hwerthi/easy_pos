@@ -96,4 +96,21 @@ export const clientOrderService = {
     const { id } = JSON.parse(session);
     return this.getOrdersBySession(id);
   },
+
+  /**
+   * Get all client orders for a specific cashier session (paginated)
+   * @param sessionId - The UUID of the cashier session
+   * @param params - Pagination parameters (page, size)
+   * @returns PaginatedResponse<ClientOrder>
+   */
+  async getBySessionId(
+    sessionId: string,
+    params: { page?: number; size?: number } = {}
+  ): Promise<PaginatedResponse<ClientOrder>> {
+    const { data } = await apiClient.get(
+      `/client/orders/session/${sessionId}`,
+      { params }
+    );
+    return data;
+  },
 };

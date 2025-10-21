@@ -24,14 +24,14 @@ const CashRegisterOpening = () => {
       try {
         const user = await userService.getCurrentUser();
         setCurrentUser(user);
-        // Update localStorage with current user info
         localStorage.setItem(
           "cashier",
           JSON.stringify({
             id: user.id,
-            name: user.firstName && user.lastName 
-              ? `${user.firstName} ${user.lastName}` 
-              : user.email.split("@")[0],
+            name:
+              user.firstName && user.lastName
+                ? `${user.firstName} ${user.lastName}`
+                : user.email.split("@")[0],
             email: user.email,
             role: user.role,
           })
@@ -40,7 +40,8 @@ const CashRegisterOpening = () => {
         console.error("Error fetching current user:", error);
         toast({
           title: "Erreur",
-          description: "Impossible de récupérer les informations de l'utilisateur",
+          description:
+            "Impossible de récupérer les informations de l'utilisateur",
           variant: "destructive",
         });
         navigate("/login");
@@ -86,9 +87,10 @@ const CashRegisterOpening = () => {
       const session = {
         id: sessionResponse.id,
         sessionNumber: sessionResponse.sessionNumber,
-        cashier: currentUser.firstName && currentUser.lastName
-          ? `${currentUser.firstName} ${currentUser.lastName}`
-          : currentUser.email.split("@")[0],
+        cashier:
+          currentUser.firstName && currentUser.lastName
+            ? `${currentUser.firstName} ${currentUser.lastName}`
+            : currentUser.email.split("@")[0],
         cashierId: currentUser.id,
         openedAt: sessionResponse.startTime,
         initialAmount: sessionResponse.openingBalance,
@@ -106,7 +108,9 @@ const CashRegisterOpening = () => {
 
       toast({
         title: "Caisse ouverte",
-        description: `Session ${sessionResponse.sessionNumber} - Fond de caisse: ${parseFloat(initialAmount).toFixed(2)} €`,
+        description: `Session ${
+          sessionResponse.sessionNumber
+        } - Fond de caisse: ${parseFloat(initialAmount).toFixed(2)} €`,
       });
 
       navigate("/pos");
@@ -114,7 +118,9 @@ const CashRegisterOpening = () => {
       console.error("Error creating session:", error);
       toast({
         title: "Erreur",
-        description: error.response?.data?.message || "Impossible d'ouvrir la caisse. Veuillez réessayer.",
+        description:
+          error.response?.data?.message ||
+          "Impossible d'ouvrir la caisse. Veuillez réessayer.",
         variant: "destructive",
       });
     } finally {
@@ -141,7 +147,8 @@ const CashRegisterOpening = () => {
           <DollarSign className="h-16 w-16 mx-auto mb-4 text-primary" />
           <h1 className="text-3xl font-bold mb-2">Ouverture de caisse</h1>
           <p className="text-muted-foreground">
-            Bienvenue {currentUser?.firstName && currentUser?.lastName
+            Bienvenue{" "}
+            {currentUser?.firstName && currentUser?.lastName
               ? `${currentUser.firstName} ${currentUser.lastName}`
               : currentUser?.email.split("@")[0]}
           </p>
