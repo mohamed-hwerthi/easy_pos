@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Download, ArrowLeft } from "lucide-react";
+import { cashierSessionService } from "@/services/cahier-session.service";
 
 const CashRegisterClosing = () => {
   const navigate = useNavigate();
@@ -16,7 +17,7 @@ const CashRegisterClosing = () => {
   const expectedCash = session.totalCash || 0;
   const difference = actualCash ? parseFloat(actualCash) - expectedCash : 0;
 
-  const handleCloseRegister = () => {
+  const handleCloseRegister = async () => {
     if (!actualCash) {
       toast({
         title: "Erreur",
@@ -26,30 +27,47 @@ const CashRegisterClosing = () => {
       return;
     }
 
-    const closedSession = {
-      ...session,
-      closedAt: new Date().toISOString(),
-      actualCash: parseFloat(actualCash),
-      cashDifference: difference,
-      status: "closed",
-    };
+    try {
+      // Call the API to close the session
+      const closedSession = await cashierSessionService.closeSession(
+        session.id,
+        parseFloat(actualCash)
+      );
 
-    const sessions = JSON.parse(localStorage.getItem("sessions") || "[]");
-    sessions.push(closedSession);
-    localStorage.setItem("sessions", JSON.stringify(sessions));
-    localStorage.removeItem("currentSession");
+      // Update local storage
+      const sessions = JSON.parse(localStorage.getItem("sessions") || "[]");
+      const updatedSession = {
+        ...session,
+        ...closedSession,
+        actualCash: parseFloat(actualCash),
+        cashDifference: difference,
+        status: "closed",
+      };
 
-    toast({
-      title: "Caisse clôturée",
-      description: difference === 0 
-        ? "Pas d'écart de caisse" 
-        : `Écart: ${difference.toFixed(2)} €`,
-      variant: difference === 0 ? "default" : "destructive",
-    });
+      sessions.push(updatedSession);
+      localStorage.setItem("sessions", JSON.stringify(sessions));
+      localStorage.removeItem("currentSession");
 
-    setTimeout(() => navigate("/login"), 1500);
+      toast({
+        title: "Caisse clôturée avec succès",
+        description:
+          difference === 0
+            ? "Pas d'écart de caisse"
+            : `Écart: ${difference.toFixed(2)} €`,
+        variant: difference === 0 ? "default" : "destructive",
+      });
+
+      setTimeout(() => navigate("/login"), 1500);
+    } catch (error) {
+      console.error("Error closing cashier session:", error);
+      toast({
+        title: "Erreur",
+        description:
+          "Une erreur est survenue lors de la fermeture de la caisse",
+        variant: "destructive",
+      });
+    }
   };
-
   const generateReport = () => {
     const report = `
 =================================
@@ -224,7 +242,13 @@ Compté: ${actualCash || "0.00"} €
                     <div className="border-t pt-2">
                       <div className="flex justify-between text-lg font-bold">
                         <span>Écart:</span>
-                        <span className={difference === 0 ? "text-success" : "text-destructive"}>
+                        <span
+                          className={
+                            difference === 0
+                              ? "text-success"
+                              : "text-destructive"
+                          }
+                        >
                           {difference > 0 ? "+" : ""}
                           {difference.toFixed(2)} €
                         </span>
