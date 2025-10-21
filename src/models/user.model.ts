@@ -1,11 +1,11 @@
 import { UserRole } from "./user-role.model";
 
 export interface UserDTO {
-  id: string; // UUID as string
+  id: string;
   firstName?: string;
   lastName?: string;
   email: string;
-  password?: string; // Only for write operations
+  password?: string;
   role: UserRole;
   imageUrl?: string;
   phoneNumber: string;

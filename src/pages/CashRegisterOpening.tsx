@@ -105,6 +105,7 @@ const CashRegisterOpening = () => {
       };
 
       localStorage.setItem("currentSession", JSON.stringify(session));
+      localStorage.setItem("cashier", JSON.stringify(currentUser));
 
       toast({
         title: "Caisse ouverte",

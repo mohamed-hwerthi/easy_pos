@@ -37,8 +37,6 @@ const Payment = () => {
   const [cashReceived, setCashReceived] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Get payment details from navigation state
-
   const paymentMethods = [
     { id: "card" as PaymentMethod, label: "Carte bancaire", icon: CreditCard },
     { id: "mobile" as PaymentMethod, label: "Mobile Pay", icon: Smartphone },
@@ -114,7 +112,9 @@ const Payment = () => {
       const cashReceivedAmount =
         selectedMethod === "cash" ? parseFloat(cashReceived) : undefined;
       const changeGivenAmount =
-        selectedMethod === "cash" ? parseFloat(cashReceived) - total : undefined;
+        selectedMethod === "cash"
+          ? parseFloat(cashReceived) - total
+          : undefined;
 
       // Place the order using the backend service
       const createdOrder = await clientOrderService.placePOSOrder(
@@ -126,7 +126,10 @@ const Payment = () => {
 
       // Update local session data for UI tracking
       const sale = {
-        id: createdOrder.orderNumber || createdOrder.id || Date.now().toString().slice(-6),
+        id:
+          createdOrder.orderNumber ||
+          createdOrder.id ||
+          Date.now().toString().slice(-6),
         date: createdOrder.createdAt || new Date().toISOString(),
         items: cartItems,
         subtotal,
@@ -150,7 +153,10 @@ const Payment = () => {
 
       if (selectedMethod === "cash") {
         currentSession.totalCash = (currentSession.totalCash || 0) + total;
-      } else if (selectedMethod === "card" || selectedMethod === "contactless") {
+      } else if (
+        selectedMethod === "card" ||
+        selectedMethod === "contactless"
+      ) {
         currentSession.totalCard = (currentSession.totalCard || 0) + total;
       }
 
@@ -294,7 +300,9 @@ const Payment = () => {
               onClick={handlePayment}
               disabled={!selectedMethod || isProcessing}
             >
-              {isProcessing ? "Traitement..." : `Ajouter paiement - ${total.toFixed(2)} €`}
+              {isProcessing
+                ? "Traitement..."
+                : `Ajouter paiement - ${total.toFixed(2)} €`}
             </Button>
           </Card>
         </div>

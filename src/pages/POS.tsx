@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { API_UPLOADS_URL } from "@/lib/api.config";
 import { ClientProduct } from "@/models/client/client-product-detail-model";
+import { UserDTO } from "@/models/user.model";
 import {
   selectCartItems,
   selectCartTotal,
@@ -15,6 +16,7 @@ import {
   removeFromCart as removeFromCartAction,
   updateQuantity,
 } from "@/redux/slices/cartSlice";
+import { cashMovementService } from "@/services/cash-mouvment.service";
 import { clientProductService } from "@/services/client/client-product-service";
 import {
   Clock,
@@ -57,7 +59,7 @@ const POS = () => {
   const cartItems = useSelector(selectCartItems);
   const cartTotal = useSelector(selectCartTotal);
 
-  const [cashier, setCashier] = useState<{ name: string } | null>(null);
+  const [cashier, setCashier] = useState<UserDTO | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [discount, setDiscount] = useState(0);
   const [session, setSession] = useState<any>(null);
@@ -154,21 +156,27 @@ const POS = () => {
     product.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleCashMovement = (movement: any) => {
+  const handleCashMovement = (createdMovement: any) => {
     const updatedSession = { ...session };
+
     if (!updatedSession.cashMovements) {
       updatedSession.cashMovements = [];
     }
-    updatedSession.cashMovements.push(movement);
+    updatedSession.cashMovements.push(createdMovement);
 
-    if (movement.type === "in") {
-      updatedSession.totalCash += movement.amount;
+    if (createdMovement.type === "IN") {
+      updatedSession.totalCash += createdMovement.amount;
     } else {
-      updatedSession.totalCash -= movement.amount;
+      updatedSession.totalCash -= createdMovement.amount;
     }
 
     localStorage.setItem("currentSession", JSON.stringify(updatedSession));
     setSession(updatedSession);
+
+    toast({
+      title: "Mouvement enregistré",
+      description: `Montant: ${createdMovement.amount} €`,
+    });
   };
 
   return (
@@ -214,7 +222,9 @@ const POS = () => {
             </div>
           </div>
           <div className="text-right">
-            <p className="font-semibold">{cashier?.name}</p>
+            <p className="font-semibold">
+              {cashier?.firstName} {cashier?.lastName}
+            </p>
             <p className="text-sm text-muted-foreground">
               <Clock className="inline h-3 w-3 mr-1" />
               {new Date().toLocaleString("fr-FR")}
@@ -301,10 +311,17 @@ const POS = () => {
                 <Badge variant="secondary">{cartItems.length}</Badge>
               </div>
               <div className="flex gap-2">
-                <CashMovementDialog type="in" onMovement={handleCashMovement} />
                 <CashMovementDialog
-                  type="out"
-                  onMovement={handleCashMovement}
+                  type="IN"
+                  onMovementCreated={handleCashMovement}
+                  sessionId={session?.id}
+                  cashierId={cashier?.id}
+                />
+                <CashMovementDialog
+                  type="OUT"
+                  onMovementCreated={handleCashMovement}
+                  sessionId={session?.id}
+                  cashierId={cashier?.id}
                 />
               </div>
             </div>

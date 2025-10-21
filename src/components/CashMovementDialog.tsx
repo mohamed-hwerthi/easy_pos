@@ -1,8 +1,4 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -11,21 +7,35 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { CashMovement } from "@/models/cash-mouvement.model";
+import { cashMovementService } from "@/services/cash-mouvment.service";
 import { ArrowDown, ArrowUp } from "lucide-react";
+import { useState } from "react";
 
 interface CashMovementDialogProps {
-  type: "in" | "out";
-  onMovement: (movement: any) => void;
+  type: "IN" | "OUT";
+  sessionId: string;
+  cashierId: string;
+  onMovementCreated: (movement: any) => void;
 }
 
-const CashMovementDialog = ({ type, onMovement }: CashMovementDialogProps) => {
+const CashMovementDialog = ({
+  type,
+  sessionId,
+  onMovementCreated,
+  cashierId,
+}: CashMovementDialogProps) => {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!amount || parseFloat(amount) <= 0) {
       toast({
         title: "Erreur",
@@ -44,45 +54,61 @@ const CashMovementDialog = ({ type, onMovement }: CashMovementDialogProps) => {
       return;
     }
 
-    const movement = {
-      id: Date.now().toString(),
+    const movementRequest: CashMovement = {
+      cashierSessionId: sessionId,
       type,
       amount: parseFloat(amount),
       reason: reason.trim(),
-      date: new Date().toISOString(),
+      cashierId: cashierId,
     };
 
-    onMovement(movement);
+    try {
+      setLoading(true);
+      const createdMovement = await cashMovementService.create(movementRequest);
+      onMovementCreated(createdMovement);
 
-    toast({
-      title: type === "in" ? "Entrée enregistrée" : "Sortie enregistrée",
-      description: `${parseFloat(amount).toFixed(2)} € - ${reason}`,
-    });
+      toast({
+        title: type === "IN" ? "Entrée enregistrée" : "Sortie enregistrée",
+        description: `${createdMovement.amount.toFixed(2)} € - ${
+          createdMovement.reason
+        }`,
+      });
 
-    setAmount("");
-    setReason("");
-    setOpen(false);
+      setAmount("");
+      setReason("");
+      setOpen(false);
+    } catch (error: any) {
+      console.error("Erreur lors de l'enregistrement du mouvement:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'enregistrer le mouvement de caisse.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          {type === "in" ? (
+        <Button variant="outline" size="sm" disabled={!sessionId}>
+          {type === "IN" ? (
             <ArrowDown className="h-4 w-4 mr-2 text-success" />
           ) : (
             <ArrowUp className="h-4 w-4 mr-2 text-destructive" />
           )}
-          {type === "in" ? "Entrée" : "Sortie"} d'espèces
+          {type === "IN" ? "Entrée" : "Sortie"} d'espèces
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {type === "in" ? "Entrée" : "Sortie"} d'espèces
+            {type === "IN" ? "Entrée" : "Sortie"} d'espèces
           </DialogTitle>
           <DialogDescription>
-            Enregistrez une {type === "in" ? "entrée" : "sortie"} d'espèces avec justificatif
+            Enregistrez une {type === "IN" ? "entrée" : "sortie"} d'espèces avec
+            justificatif
           </DialogDescription>
         </DialogHeader>
 
@@ -97,6 +123,7 @@ const CashMovementDialog = ({ type, onMovement }: CashMovementDialogProps) => {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               className="mt-2"
+              disabled={loading}
             />
           </div>
 
@@ -109,11 +136,12 @@ const CashMovementDialog = ({ type, onMovement }: CashMovementDialogProps) => {
               onChange={(e) => setReason(e.target.value)}
               className="mt-2"
               rows={4}
+              disabled={loading}
             />
           </div>
 
-          <Button className="w-full" onClick={handleSubmit}>
-            Valider
+          <Button className="w-full" onClick={handleSubmit} disabled={loading}>
+            {loading ? "Enregistrement..." : "Valider"}
           </Button>
         </div>
       </DialogContent>

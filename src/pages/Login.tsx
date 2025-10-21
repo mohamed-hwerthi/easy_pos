@@ -38,17 +38,6 @@ const Login = () => {
       }
       localStorage.setItem("accessToken", authResponse.accessToken);
       localStorage.setItem("role", authResponse.role);
-      localStorage.setItem(
-        "cashier",
-        JSON.stringify({
-          id: authResponse.storeId,
-          name: email.split("@")[0],
-          email,
-          role: authResponse.role,
-          storeId: authResponse.storeId,
-        })
-      );
-
       toast({
         title: "Connexion réussie",
         description: `Bienvenue, vous êtes connecté en tant que caissier`,
