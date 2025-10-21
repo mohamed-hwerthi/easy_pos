@@ -4,7 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Search, Printer, RotateCcw } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { ArrowLeft, Search, Printer, RotateCcw, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ClientOrder } from "@/models/client/client-order.model";
 import { clientOrderService } from "@/services/client/client-order.service";
@@ -16,6 +23,8 @@ const SalesHistory = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [sales, setSales] = useState<ClientOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSale, setSelectedSale] = useState<ClientOrder | null>(null);
+  const [showTicket, setShowTicket] = useState(false);
 
   const session = JSON.parse(localStorage.getItem("currentSession") || "{}");
   const sessionId = session?.id;
@@ -58,8 +67,7 @@ const SalesHistory = () => {
     sale.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleReprint = (sale: ClientOrder) => {
-    const ticket = `
+  const buildTicket = (sale: ClientOrder): string => `
 ================================
        TICKET DE CAISSE
 ================================
@@ -90,13 +98,50 @@ Paiement: Espèces
 
 Merci de votre visite !
 ================================
-    `;
+  `;
 
-    console.log(ticket);
+  const handlePrint = (sale: ClientOrder) => {
+    const ticket = buildTicket(sale);
+    const printWindow = window.open("", "_blank", "width=400,height=600");
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Ticket ${sale.orderNumber}</title>
+            <style>
+              body {
+                font-family: monospace;
+                white-space: pre;
+                font-size: 13px;
+                margin: 10px;
+              }
+              @media print {
+                @page { margin: 0; }
+              }
+            </style>
+          </head>
+          <body>
+            <pre>${ticket}</pre>
+            <script>
+              window.onload = () => {
+                window.print();
+                window.onafterprint = () => window.close();
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
     toast({
-      title: "Ticket réimprimé",
-      description: `Ticket ${sale.orderNumber}`,
+      title: "Ticket imprimé",
+      description: `Ticket ${sale.orderNumber} en cours d'impression.`,
     });
+  };
+
+  const handleViewTicket = (sale: ClientOrder) => {
+    setSelectedSale(sale);
+    setShowTicket(true);
   };
 
   const handleRefund = (sale: ClientOrder) => {
@@ -186,11 +231,20 @@ Merci de votre visite !
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleReprint(sale)}
+                    onClick={() => handleViewTicket(sale)}
+                    className="flex-1"
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    Voir le ticket
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePrint(sale)}
                     className="flex-1"
                   >
                     <Printer className="h-4 w-4 mr-2" />
-                    Réimprimer
+                    Imprimer
                   </Button>
                   <Button
                     variant="outline"
@@ -207,6 +261,31 @@ Merci de votre visite !
           </div>
         )}
       </div>
+
+      {/* ✅ Ticket Preview Modal */}
+      <Dialog open={showTicket} onOpenChange={setShowTicket}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ticket #{selectedSale?.orderNumber}</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[70vh] overflow-y-auto bg-muted p-4 rounded font-mono text-sm whitespace-pre-wrap">
+            {selectedSale
+              ? buildTicket(selectedSale)
+              : "Chargement du ticket..."}
+          </div>
+          <DialogFooter className="mt-4 flex justify-between">
+            <Button variant="secondary" onClick={() => setShowTicket(false)}>
+              Fermer
+            </Button>
+            {selectedSale && (
+              <Button onClick={() => handlePrint(selectedSale)}>
+                <Printer className="h-4 w-4 mr-2" />
+                Imprimer
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
