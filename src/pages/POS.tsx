@@ -149,7 +149,7 @@ const POS = () => {
 
   const subtotal = cartTotal;
   const discountAmount = (subtotal * discount) / 100;
-  const tax = (subtotal - discountAmount) * 0; // 0% TVA for now
+  const tax = (subtotal - discountAmount) * 0;
   const total = subtotal - discountAmount + tax;
 
   const filteredProducts = products.filter((product) =>
