@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -6,44 +6,87 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Search, Printer, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ClientOrder } from "@/models/client/client-order.model";
+import { clientOrderService } from "@/services/client/client-order.service";
 
 const SalesHistory = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [searchQuery, setSearchQuery] = useState("");
-  const session = JSON.parse(localStorage.getItem("currentSession") || '{"sales": []}');
-  const sales = session.sales || [];
 
-  const filteredSales = sales.filter((sale: any) =>
-    sale.id.toLowerCase().includes(searchQuery.toLowerCase())
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sales, setSales] = useState<ClientOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const session = JSON.parse(localStorage.getItem("currentSession") || "{}");
+  const sessionId = session?.id;
+
+  useEffect(() => {
+    const fetchSales = async () => {
+      if (!sessionId) {
+        toast({
+          title: "Erreur",
+          description: "Aucune session de caisse active trouvée.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await clientOrderService.getBySessionId(sessionId, {
+          page: 0,
+          size: 50,
+        });
+        setSales(response.items || []);
+      } catch (error: any) {
+        console.error("Erreur lors du chargement des ventes:", error);
+        toast({
+          title: "Erreur",
+          description: "Impossible de charger les ventes depuis le serveur.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSales();
+  }, [sessionId]);
+
+  const filteredSales = sales.filter((sale) =>
+    sale.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleReprint = (sale: any) => {
+  const handleReprint = (sale: ClientOrder) => {
     const ticket = `
 ================================
        TICKET DE CAISSE
 ================================
 
-N° ${sale.id}
-${new Date(sale.date).toLocaleString("fr-FR")}
-Caissier: ${session.cashier}
+N° ${sale.orderNumber}
+${new Date(sale.createdAt || "").toLocaleString("fr-FR")}
+Caissier: ${session.cashier || "N/A"}
 
 --------------------------------
 ARTICLES
 --------------------------------
-${sale.items.map((item: any) => 
-  `${item.name}
-${item.quantity} x ${item.price.toFixed(2)} € = ${(item.quantity * item.price).toFixed(2)} €`
-).join('\n\n')}
+${sale.orderItems
+  .map(
+    (item) =>
+      `${item.productName}\n${item.quantity} x ${item.unitPrice.toFixed(
+        2
+      )} € = ${(item.quantity * item.unitPrice).toFixed(2)} €`
+  )
+  .join("\n\n")}
 
 --------------------------------
 TOTAL
 --------------------------------
-Sous-total: ${sale.subtotal.toFixed(2)} €
-TVA (0%): ${sale.tax.toFixed(2)} €
-TOTAL: ${sale.total.toFixed(2)} €
+Sous-total: ${sale.subTotal?.toFixed(2)} €
+TOTAL: ${sale.total?.toFixed(2)} €
 
-Paiement: ${sale.paymentMethod}
+Paiement: Espèces
 
 Merci de votre visite !
 ================================
@@ -52,14 +95,14 @@ Merci de votre visite !
     console.log(ticket);
     toast({
       title: "Ticket réimprimé",
-      description: `Ticket ${sale.id}`,
+      description: `Ticket ${sale.orderNumber}`,
     });
   };
 
-  const handleRefund = (sale: any) => {
+  const handleRefund = (sale: ClientOrder) => {
     toast({
       title: "Remboursement",
-      description: "Fonction de remboursement en développement",
+      description: `Remboursement du ticket ${sale.orderNumber} (en développement)`,
     });
   };
 
@@ -93,38 +136,46 @@ Merci de votre visite !
           </div>
         </div>
 
-        <div className="space-y-4">
-          {filteredSales.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">Aucune vente trouvée</p>
-            </Card>
-          ) : (
-            filteredSales.map((sale: any) => (
+        {loading ? (
+          <Card className="p-8 text-center">
+            <p>Chargement des ventes...</p>
+          </Card>
+        ) : filteredSales.length === 0 ? (
+          <Card className="p-8 text-center">
+            <p className="text-muted-foreground">Aucune vente trouvée</p>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {filteredSales.map((sale) => (
               <Card key={sale.id} className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h3 className="font-bold text-lg">Ticket #{sale.id}</h3>
+                    <h3 className="font-bold text-lg">
+                      Ticket #{sale.orderNumber}
+                    </h3>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(sale.date).toLocaleString("fr-FR")}
+                      {new Date(sale.createdAt || "").toLocaleString("fr-FR")}
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Badge variant="secondary">{sale.paymentMethod}</Badge>
+                    <Badge variant="secondary">
+                      {sale.status || "Inconnu"}
+                    </Badge>
                     <Badge className="bg-success text-white">
-                      {sale.total.toFixed(2)} €
+                      {sale.total?.toFixed(2)} €
                     </Badge>
                   </div>
                 </div>
 
                 <div className="border-t pt-4 mb-4">
                   <div className="space-y-2">
-                    {sale.items.map((item: any, index: number) => (
+                    {sale.orderItems.map((item, index) => (
                       <div key={index} className="flex justify-between text-sm">
                         <span>
-                          {item.quantity}x {item.name}
+                          {item.quantity}x {item.productName}
                         </span>
                         <span className="font-semibold">
-                          {(item.quantity * item.price).toFixed(2)} €
+                          {(item.quantity * item.unitPrice).toFixed(2)} €
                         </span>
                       </div>
                     ))}
@@ -152,9 +203,9 @@ Merci de votre visite !
                   </Button>
                 </div>
               </Card>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
