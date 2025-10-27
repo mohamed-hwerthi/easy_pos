@@ -26,12 +26,10 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle token expiration
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid - redirect to login
       localStorage.removeItem("accessToken");
       localStorage.removeItem("cashier");
       localStorage.removeItem("role");
