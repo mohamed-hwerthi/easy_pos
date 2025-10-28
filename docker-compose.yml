@@ -1,0 +1,8 @@
+version: "3"
+services:
+  react-app:
+    build: .
+    container_name: react-vite-app
+    ports:
+      - "3002:80"
+    restart: always
