@@ -1,9 +1,21 @@
 import axios from "axios";
 
-export const API_BASE_URL = "http://localhost:8080/api";
-export const API_UPLOADS_URL = "http://localhost:8080/";
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
+export const API_UPLOADS_URL =
+  import.meta.env.VITE_API_UPLOADS_URL || "http://localhost:8080/";
 
-// Create axios instance with default config
+if (import.meta.env.DEV) {
+  if (!import.meta.env.VITE_API_BASE_URL) {
+    console.warn("VITE_API_BASE_URL is not defined in environment variables");
+  }
+  if (!import.meta.env.VITE_API_UPLOADS_URL) {
+    console.warn(
+      "VITE_API_UPLOADS_URL is not defined in environment variables"
+    );
+  }
+}
+
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
@@ -12,7 +24,6 @@ export const apiClient = axios.create({
   },
 });
 
-// Request interceptor to add access token to every request
 apiClient.interceptors.request.use(
   (config) => {
     const accessToken = localStorage.getItem("accessToken");
