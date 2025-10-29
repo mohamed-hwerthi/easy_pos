@@ -1,20 +1,35 @@
-# Step 1: Build the app
-FROM node:18 AS build
-
+# ===== Build stage =====
+FROM node:18-alpine AS builder
 WORKDIR /app
+
+# Accept build arguments
+ARG VITE_API_BASE_URL
+ARG VITE_API_UPLOADS_URL
+
+# Set environment variables for build
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_API_UPLOADS_URL=$VITE_API_UPLOADS_URL
+
+# Install dependencies
 COPY package*.json ./
 RUN npm install
+
+# Copy source code
 COPY . .
+
+# Build Vite app (this embeds the env vars)
 RUN npm run build
 
-# Step 2: Serve the built files with Nginx
+# ===== Production stage =====
 FROM nginx:stable-alpine
 
-# Remove default Nginx site and copy your built app
+# Remove default Nginx site
 RUN rm -rf /usr/share/nginx/html/*
-COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copy custom Nginx config (optional)
+# Copy built app from builder stage
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Copy custom Nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80

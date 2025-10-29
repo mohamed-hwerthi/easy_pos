@@ -1,8 +1,15 @@
 version: "3"
 services:
   react-app:
-    build: .
+    build:
+      context: .
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_API_UPLOADS_URL: ${VITE_API_UPLOADS_URL}
     container_name: react-vite-app
     ports:
       - "3002:80"
     restart: always
+    environment:
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL}
+      - VITE_API_UPLOADS_URL=${VITE_API_UPLOADS_URL}
