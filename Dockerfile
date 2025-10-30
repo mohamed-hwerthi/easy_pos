@@ -14,10 +14,11 @@ ENV VITE_API_UPLOADS_URL=$VITE_API_UPLOADS_URL
 COPY package*.json ./
 RUN npm install
 
-# Copy source code
+# Copy source code and environment files
 COPY . .
+COPY .env.production .env.production
 
-# Build Vite app (this embeds the env vars)
+# Build Vite app with production mode
 RUN npm run build
 
 # ===== Production stage =====
