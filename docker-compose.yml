@@ -1,4 +1,4 @@
-version: "3"
+version: "3.8"
 services:
   react-app:
     build:
@@ -10,6 +10,3 @@ services:
     ports:
       - "3002:80"
     restart: always
-    environment:
-      - VITE_API_BASE_URL=${VITE_API_BASE_URL}
-      - VITE_API_UPLOADS_URL=${VITE_API_UPLOADS_URL}
