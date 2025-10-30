@@ -8,6 +8,7 @@ export const authService = {
     email: string;
     password: string;
   }): Promise<AuthResponse> {
+    console.log(API_BASE_URL);
     const { data } = await axios.post(
       `${API_BASE_URL}/auth/sign-in`,
       credentials,
@@ -18,19 +19,22 @@ export const authService = {
 
   // Logout
   async logout(): Promise<any> {
-    const { data } = await apiClient.post("/auth/logout", {});
+    const { data } = await apiClient.post(`${API_BASE_URL}/auth/logout`, {});
     return data;
   },
 
   // Get Current User
   async getCurrentUser(): Promise<any> {
-    const { data } = await apiClient.get("/auth/current-user");
+    const { data } = await apiClient.get(`${API_BASE_URL}/auth/current-user`);
     return data;
   },
 
   // Token Refresh
   async refreshToken(): Promise<any> {
-    const { data } = await apiClient.post("/token/refresh-token", {});
+    const { data } = await apiClient.post(
+      `${API_BASE_URL}/token/refresh-token`,
+      {}
+    );
     return data;
   },
 };
