@@ -1,5 +1,6 @@
-import { apiClient } from "@/lib/api.config";
+import { API_BASE_URL, apiClient } from "@/lib/api.config";
 import { ClientStore } from "@/models/client/client-store-model";
+import axios from "axios";
 
 /**
  * Service for managing Stores.
@@ -14,7 +15,9 @@ export const clientStoreService = {
    * @returns Promise resolving to ClientStore
    */
   async getBySlug(slug: string): Promise<ClientStore> {
-    const { data } = await apiClient.get(`/client/stores/by-slug/${slug}`);
+    const { data } = await axios.get(
+      `${API_BASE_URL}/client/stores/by-slug/${slug}`
+    );
     return data;
   },
 };
