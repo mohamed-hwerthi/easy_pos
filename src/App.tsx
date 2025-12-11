@@ -9,10 +9,10 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import CashRegisterOpening from "./pages/CashRegisterOpening";
 import POS from "./pages/POS";
-import Payment from "./pages/Payment";
 import SalesHistory from "./pages/SalesHistory";
 import CashRegisterClosing from "./pages/CashRegisterClosing";
 import NotFound from "./pages/NotFound";
+import Tables from "./pages/table";
 
 const queryClient = new QueryClient();
 
@@ -32,7 +32,7 @@ const App = () => {
                 element={<CashRegisterOpening />}
               />
               <Route path="/pos" element={<POS />} />
-              <Route path="/payment" element={<Payment />} />
+              <Route path="/tables" element={<Tables />} />
               <Route path="/sales-history" element={<SalesHistory />} />
               <Route
                 path="/cash-register-closing"

@@ -41,8 +41,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import PaymentModal from "./Payment";
-import { shortcuts } from "@/utils/constants";
+import { shortcuts } from "@/utils/constants/constants";
+import PaymentModal from "./Payment-modal";
 
 interface Product {
   id: string;
@@ -90,7 +90,6 @@ const POS = () => {
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  // Focus sur la recherche au chargement
   useEffect(() => {
     setTimeout(() => {
       searchInputRef.current?.focus();
@@ -179,15 +178,11 @@ const POS = () => {
     fetchProducts();
   }, [toast]);
 
-  // Raccourcis clavier
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      // Si le modal des raccourcis est ouvert, ne pas traiter les raccourcis
       if (showShortcuts && e.key !== "F12" && e.key !== "Escape") {
         return;
       }
-
-      // ESC: Vider la recherche ou fermer modal
       if (e.key === "Escape") {
         if (showShortcuts) {
           setShowShortcuts(false);
@@ -198,7 +193,6 @@ const POS = () => {
         return;
       }
 
-      // F1: Aller au paiement
       if (e.key === "F1" && cartItems.length > 0) {
         e.preventDefault();
         navigate("/payment", {
@@ -206,36 +200,30 @@ const POS = () => {
         });
         return;
       }
-
-      // F2: Historique
       if (e.key === "F2") {
         e.preventDefault();
         navigate("/sales-history");
         return;
       }
 
-      // F3: Clôture
       if (e.key === "F3") {
         e.preventDefault();
         navigate("/cash-register-closing");
         return;
       }
 
-      // F4: Tables
       if (e.key === "F4") {
         e.preventDefault();
         navigate("/tables");
         return;
       }
 
-      // F5: Vider panier
       if (e.key === "F5" && cartItems.length > 0) {
         e.preventDefault();
         clearCart();
         return;
       }
 
-      // F6: Focus recherche
       if (e.key === "F6") {
         e.preventDefault();
         searchInputRef.current?.focus();
@@ -243,21 +231,18 @@ const POS = () => {
         return;
       }
 
-      // F7: Ajouter premier produit de la recherche
       if (e.key === "F7" && filteredProducts.length > 0) {
         e.preventDefault();
         addToCart(filteredProducts[0]);
         return;
       }
 
-      // F8: Actualiser produits
       if (e.key === "F8") {
         e.preventDefault();
         window.location.reload();
         return;
       }
 
-      // F9: Retirer dernier article
       if (e.key === "F9" && cartItems.length > 0) {
         e.preventDefault();
         const lastItem = cartItems[cartItems.length - 1];
@@ -265,23 +250,18 @@ const POS = () => {
         return;
       }
 
-      // F10: Accueil
       if (e.key === "F10") {
         e.preventDefault();
         navigate("/");
         return;
       }
 
-      // F11: Déconnecter (Plein écran navigateur par défaut, on le laisse)
-
-      // F12: Afficher raccourcis
       if (e.key === "F12") {
         e.preventDefault();
         setShowShortcuts(!showShortcuts);
         return;
       }
 
-      // Del/Suppr: Retirer dernier article
       if (e.key === "Delete" && cartItems.length > 0) {
         e.preventDefault();
         const lastItem = cartItems[cartItems.length - 1];
@@ -289,17 +269,14 @@ const POS = () => {
         return;
       }
 
-      // Ctrl+A: Sélectionner recherche
       if (
         e.ctrlKey &&
         e.key === "a" &&
         document.activeElement === searchInputRef.current
       ) {
-        // Laisser le comportement par défaut
         return;
       }
 
-      // Ctrl+N: Nouveau (vider panier et recherche)
       if (e.ctrlKey && e.key === "n") {
         e.preventDefault();
         clearCart();
@@ -308,7 +285,6 @@ const POS = () => {
         return;
       }
 
-      // Ctrl+P: Imprimer (désactivé pour éviter conflit)
       if (e.ctrlKey && e.key === "p") {
         e.preventDefault();
         toast({
@@ -318,14 +294,12 @@ const POS = () => {
         return;
       }
 
-      // Ctrl+H: Historique
       if (e.ctrlKey && e.key === "h") {
         e.preventDefault();
         navigate("/sales-history");
         return;
       }
 
-      // + : Augmenter quantité dernier article
       if (e.key === "+" && cartItems.length > 0) {
         e.preventDefault();
         const lastItem = cartItems[cartItems.length - 1];
@@ -333,7 +307,6 @@ const POS = () => {
         return;
       }
 
-      // - : Diminuer quantité dernier article
       if (e.key === "-" && cartItems.length > 0) {
         e.preventDefault();
         const lastItem = cartItems[cartItems.length - 1];
@@ -341,7 +314,6 @@ const POS = () => {
         return;
       }
 
-      // Enter: Ajouter premier produit si recherche active
       if (e.key === "Enter" && searchQuery && filteredProducts.length > 0) {
         e.preventDefault();
         addToCart(filteredProducts[0]);
