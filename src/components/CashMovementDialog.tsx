@@ -14,13 +14,15 @@ import { useToast } from "@/hooks/use-toast";
 import { CashMovement } from "@/models/cash-mouvement.model";
 import { cashMovementService } from "@/services/cash-mouvment.service";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { useState } from "react";
+import { Dispatch, SetStateAction, useState } from "react";
 
 interface CashMovementDialogProps {
   type: "IN" | "OUT";
   sessionId: string;
   cashierId: string;
   onMovementCreated: (movement: any) => void;
+  open?: boolean;
+  onOpenChange?: Dispatch<SetStateAction<boolean>>;
 }
 
 const CashMovementDialog = ({
@@ -28,12 +30,17 @@ const CashMovementDialog = ({
   sessionId,
   onMovementCreated,
   cashierId,
+  open: externalOpen,
+  onOpenChange: externalOnOpenChange,
 }: CashMovementDialogProps) => {
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = externalOnOpenChange || setInternalOpen;
 
   const handleSubmit = async () => {
     if (!amount || parseFloat(amount) <= 0) {

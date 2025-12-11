@@ -1,82 +1,122 @@
-import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  ArrowLeft,
-  CreditCard,
-  Smartphone,
-  Gift,
-  Banknote,
-  ContactRound,
-} from "lucide-react";
+import { X, Banknote, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { clientOrderService } from "@/services/client/client-order.service";
-import { ClientOrderItem } from "@/models/client/client-order-item.model";
-import { CartItem } from "@/redux/slices/cartSlice";
 import { clearCart } from "@/redux/slices/cartSlice";
 
-type PaymentMethod = "card" | "mobile" | "cash" | "gift" | "contactless";
+interface PaymentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  cartItems: any[];
+  total: number;
+  subtotal: number;
+}
 
-const Payment = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
+const PaymentModal = ({
+  isOpen,
+  onClose,
+  cartItems,
+  total,
+  subtotal,
+}: PaymentModalProps) => {
   const { toast } = useToast();
-  const { total, subtotal, tax } = location.state || {
-    total: 0,
-    subtotal: 0,
-    tax: 0,
-  };
-
   const dispatch = useDispatch();
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(
-    null
-  );
   const [cashReceived, setCashReceived] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const paymentMethods = [
-    { id: "card" as PaymentMethod, label: "Carte bancaire", icon: CreditCard },
-    { id: "mobile" as PaymentMethod, label: "Mobile Pay", icon: Smartphone },
-    {
-      id: "contactless" as PaymentMethod,
-      label: "Sans contact",
-      icon: ContactRound,
-    },
-    { id: "cash" as PaymentMethod, label: "Espèces", icon: Banknote },
-    { id: "gift" as PaymentMethod, label: "Carte cadeau", icon: Gift },
-  ];
+  const change = parseFloat(cashReceived || "0") - total;
+
+  // Gérer la saisie clavier rapide
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+
+      // ESC pour fermer
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+
+      // Entrée pour valider si montant suffisant
+      if (e.key === "Enter" && parseFloat(cashReceived) >= total) {
+        e.preventDefault();
+        handlePayment();
+        return;
+      }
+
+      // Chiffres pour saisie directe
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        // Si vide ou 0, remplacer, sinon ajouter
+        if (!cashReceived || cashReceived === "0.00" || cashReceived === "0") {
+          setCashReceived(e.key + ".00");
+        } else {
+          const current = parseFloat(cashReceived);
+          const newValue = current * 10 + parseInt(e.key);
+          setCashReceived(newValue.toFixed(2));
+        }
+        return;
+      }
+
+      // Backspace pour effacer dernier chiffre
+      if (e.key === "Backspace") {
+        e.preventDefault();
+        if (cashReceived && cashReceived !== "0.00") {
+          const current = parseFloat(cashReceived);
+          const newValue = Math.floor(current / 10);
+          setCashReceived(newValue > 0 ? newValue.toFixed(2) : "0.00");
+        }
+        return;
+      }
+
+      // C pour clear
+      if (e.key === "c" || e.key === "C") {
+        e.preventDefault();
+        setCashReceived("");
+        return;
+      }
+
+      // + pour ajouter 1 euro
+      if (e.key === "+") {
+        e.preventDefault();
+        const current = parseFloat(cashReceived || "0");
+        setCashReceived((current + 1).toFixed(2));
+        return;
+      }
+
+      // - pour retirer 1 euro
+      if (e.key === "-") {
+        e.preventDefault();
+        const current = parseFloat(cashReceived || "0");
+        if (current > 1) {
+          setCashReceived((current - 1).toFixed(2));
+        }
+        return;
+      }
+
+      // Point/virgule pour décimale
+      if (e.key === "." || e.key === ",") {
+        e.preventDefault();
+        if (cashReceived && !cashReceived.includes(".")) {
+          setCashReceived(cashReceived + ".00");
+        }
+        return;
+      }
+    };
+
+    if (isOpen) {
+      window.addEventListener("keydown", handleKeyPress);
+      return () => window.removeEventListener("keydown", handleKeyPress);
+    }
+  }, [isOpen, cashReceived, total]);
 
   const handlePayment = async () => {
-    if (!selectedMethod) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez sélectionner une méthode de paiement",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (selectedMethod === "cash" && parseFloat(cashReceived) < total) {
+    if (parseFloat(cashReceived) < total) {
       toast({
         title: "Montant insuffisant",
-        description: "Le montant reçu est inférieur au total",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Get current session from localStorage
-    const currentSession = JSON.parse(
-      localStorage.getItem("currentSession") || "{}"
-    );
-
-    if (!currentSession.id) {
-      toast({
-        title: "Erreur",
-        description: "Session de caisse non trouvée",
         variant: "destructive",
       });
       return;
@@ -85,102 +125,68 @@ const Payment = () => {
     setIsProcessing(true);
 
     try {
-      // Convert cart items to order items
-      const cartItems: CartItem[] = location.state.cart || [];
-      const orderItems: ClientOrderItem[] = cartItems.map((item) => ({
+      const currentSession = JSON.parse(
+        localStorage.getItem("currentSession") || "{}"
+      );
+
+      const orderItems = cartItems.map((item) => ({
         productId: item.itemId,
         productName: item.itemTitle,
         unitPrice: item.itemPrice,
         quantity: item.itemQuantity,
-        mediasUrls: item.itemImage ? [item.itemImage] : [],
-        options: item.itemOptions?.map((opt) => ({
-          optionId: opt.optionId,
-          optionName: opt.optionName,
-          optionPrice: opt.optionPrice || 0,
-        })),
         totalPrice: item.itemTotalPrice,
+        options: item.itemOptions,
       }));
 
-      // Prepare order data
-      const orderData = {
-        orderItems,
-        total,
-        subTotal: subtotal,
-      };
+      const cashReceivedAmount = parseFloat(cashReceived);
+      const changeGivenAmount = cashReceivedAmount - total;
 
-      // Calculate cash received and change for cash payments
-      const cashReceivedAmount =
-        selectedMethod === "cash" ? parseFloat(cashReceived) : undefined;
-      const changeGivenAmount =
-        selectedMethod === "cash"
-          ? parseFloat(cashReceived) - total
-          : undefined;
-
-      // Place the order using the backend service
-      const createdOrder = await clientOrderService.placePOSOrder(
-        orderData,
+      await clientOrderService.placePOSOrder(
+        {
+          orderItems,
+          total,
+          subTotal: subtotal,
+        },
         currentSession.id,
         cashReceivedAmount,
         changeGivenAmount
       );
 
-      // Update local session data for UI tracking
-      const sale = {
-        id:
-          createdOrder.orderNumber ||
-          createdOrder.id ||
-          Date.now().toString().slice(-6),
-        date: createdOrder.createdAt || new Date().toISOString(),
-        items: cartItems,
-        subtotal,
-        tax,
-        total,
-        paymentMethod:
-          selectedMethod === "card"
-            ? "Carte"
-            : selectedMethod === "mobile"
-            ? "Mobile"
-            : selectedMethod === "cash"
-            ? "Espèces"
-            : selectedMethod === "contactless"
-            ? "Sans contact"
-            : "Carte cadeau",
-      };
+      // Mettre à jour la session
+      if (currentSession.id) {
+        const sale = {
+          id: Date.now().toString().slice(-6),
+          date: new Date().toISOString(),
+          total,
+          paymentMethod: "cash",
+        };
 
-      if (!currentSession.sales) currentSession.sales = [];
-      currentSession.sales.push(sale);
-      currentSession.totalSales = (currentSession.totalSales || 0) + total;
-
-      if (selectedMethod === "cash") {
+        currentSession.sales = currentSession.sales || [];
+        currentSession.sales.push(sale);
+        currentSession.totalSales = (currentSession.totalSales || 0) + total;
         currentSession.totalCash = (currentSession.totalCash || 0) + total;
-      } else if (
-        selectedMethod === "card" ||
-        selectedMethod === "contactless"
-      ) {
-        currentSession.totalCard = (currentSession.totalCard || 0) + total;
+        localStorage.setItem("currentSession", JSON.stringify(currentSession));
       }
 
-      localStorage.setItem("currentSession", JSON.stringify(currentSession));
-
-      // Clear the cart after successful order
+      // Vider le panier
       dispatch(clearCart());
 
       toast({
-        title: "Paiement réussi",
-        description: `Commande #${sale.id} - ${total.toFixed(2)} €`,
+        title: "Paiement accepté",
+        description: `Ticket #${Date.now()
+          .toString()
+          .slice(-6)} • Monnaie: ${changeGivenAmount.toFixed(2)} €`,
       });
 
+      // Fermer après succès
       setTimeout(() => {
-        navigate("/pos");
-      }, 1500);
+        onClose();
+        setCashReceived("");
+      }, 800);
     } catch (error: any) {
-      console.error("Error placing order:", error);
       toast({
-        title: "Erreur de paiement",
-        description:
-          error.response?.data?.message ||
-          error.message ||
-          "Impossible de traiter le paiement. Veuillez réessayer.",
+        title: "Erreur",
+        description: error.response?.data?.message || "Paiement échoué",
         variant: "destructive",
       });
     } finally {
@@ -188,167 +194,112 @@ const Payment = () => {
     }
   };
 
-  const change =
-    selectedMethod === "cash" ? parseFloat(cashReceived || "0") - total : 0;
+  if (!isOpen) return null;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/pos")}
-              className="gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Retour au panier
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">Paiement</h1>
-              <p className="text-sm text-muted-foreground">
-                Total à payer: {total.toFixed(2)} €
-              </p>
-            </div>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg w-full max-w-md">
+        {/* En-tête simple */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center gap-2">
+            <Banknote className="h-5 w-5 text-green-600" />
+            <h2 className="text-xl font-bold">PAIEMENT</h2>
           </div>
-          <div className="text-right">
-            <p className="font-semibold">Caisse 1</p>
-            <p className="text-sm text-muted-foreground">
-              {new Date().toLocaleString("fr-FR")}
-            </p>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="h-8 w-8 p-0"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
-      </header>
 
-      <div className="flex gap-6 p-6">
-        <div className="flex-1">
-          <Card className="p-6">
-            <h2 className="mb-6 text-xl font-bold">
-              Choisir une méthode de paiement
-            </h2>
-            <p className="mb-4 text-muted-foreground">
-              Montant restant à payer: {total.toFixed(2)} €
-            </p>
-
-            <div className="mb-6 grid grid-cols-3 gap-4">
-              {paymentMethods.map((method) => {
-                const Icon = method.icon;
-                return (
-                  <Button
-                    key={method.id}
-                    variant={
-                      selectedMethod === method.id ? "default" : "outline"
-                    }
-                    className="h-24 flex-col gap-2"
-                    onClick={() => setSelectedMethod(method.id)}
-                  >
-                    <Icon className="h-6 w-6" />
-                    <span>{method.label}</span>
-                  </Button>
-                );
-              })}
+        {/* Contenu minimal */}
+        <div className="p-6">
+          {/* Total bien visible */}
+          <div className="text-center mb-6">
+            <div className="text-sm text-gray-500">À PAYER</div>
+            <div className="text-6xl font-bold text-green-600 my-3">
+              {total.toFixed(2)} €
             </div>
+          </div>
 
-            {selectedMethod === "cash" && (
-              <Card className="bg-secondary/30 p-6">
-                <div className="flex items-center gap-2">
-                  <Banknote className="h-5 w-5" />
-                  <h3 className="font-semibold">Paiement en espèces</h3>
-                </div>
-                <div className="mt-4 space-y-4">
-                  <div>
-                    <label className="text-sm font-medium">Montant reçu</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder={`Minimum: ${total.toFixed(2)} €`}
-                      value={cashReceived}
-                      onChange={(e) => setCashReceived(e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  {cashReceived && parseFloat(cashReceived) >= total && (
-                    <div className="space-y-2 rounded-lg bg-card p-4">
-                      <div className="flex justify-between">
-                        <span>Montant reçu:</span>
-                        <span className="font-semibold">
-                          {parseFloat(cashReceived).toFixed(2)} €
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Montant dû:</span>
-                        <span className="font-semibold">
-                          {total.toFixed(2)} €
-                        </span>
-                      </div>
-                      <div className="flex justify-between border-t pt-2 text-lg font-bold">
-                        <span>Monnaie à rendre:</span>
-                        <span className="text-success">
-                          {change.toFixed(2)} €
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Card>
+          {/* Champ de saisie */}
+          <div className="mb-6">
+            <div className="text-sm font-medium mb-2">MONTANT REÇU</div>
+            <Input
+              type="number"
+              step="0.01"
+              value={cashReceived}
+              onChange={(e) => setCashReceived(e.target.value)}
+              className="text-4xl h-16 text-center font-bold border-2"
+              placeholder="0.00"
+              autoFocus
+            />
+            <div className="flex justify-between mt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCashReceived(total.toFixed(2))}
+                className="h-7 text-xs"
+              >
+                Montant exact
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCashReceived("")}
+                className="h-7 text-xs"
+              >
+                Effacer
+              </Button>
+            </div>
+          </div>
+
+          {/* Monnaie à rendre */}
+          {cashReceived && (
+            <div
+              className={`p-4 rounded-lg mb-6 border text-center ${
+                change >= 0
+                  ? "bg-green-50 border-green-200 text-green-700"
+                  : "bg-red-50 border-red-200 text-red-700"
+              }`}
+            >
+              <div className="text-sm font-medium">
+                {change >= 0 ? "MONNAIE À RENDRE" : "MANQUE"}
+              </div>
+              <div className="text-3xl font-bold mt-1">
+                {Math.abs(change).toFixed(2)} €
+              </div>
+            </div>
+          )}
+
+          {/* Bouton principal */}
+          <Button
+            size="lg"
+            className="w-full h-14 text-lg"
+            onClick={handlePayment}
+            disabled={
+              !cashReceived || parseFloat(cashReceived) < total || isProcessing
+            }
+          >
+            {isProcessing ? (
+              <span className="flex items-center gap-2">
+                <span className="animate-spin">⟳</span>
+                TRAITEMENT...
+              </span>
+            ) : (
+              <>
+                <Check className="mr-2 h-5 w-5" />
+                VALIDER (ENTRÉE)
+              </>
             )}
-
-            <Button
-              size="lg"
-              className="mt-6 w-full"
-              onClick={handlePayment}
-              disabled={!selectedMethod || isProcessing}
-            >
-              {isProcessing
-                ? "Traitement..."
-                : `Ajouter paiement - ${total.toFixed(2)} €`}
-            </Button>
-          </Card>
-        </div>
-
-        <div className="w-96">
-          <Card className="p-6">
-            <h2 className="mb-4 text-xl font-bold">
-              Récapitulatif du paiement
-            </h2>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span>Sous-total:</span>
-                <span className="font-semibold">{subtotal.toFixed(2)} €</span>
-              </div>
-              <div className="flex justify-between">
-                <span>TVA (0%):</span>
-                <span className="font-semibold">{tax.toFixed(2)} €</span>
-              </div>
-              <div className="border-t pt-3">
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total:</span>
-                  <span className="text-success">{total.toFixed(2)} €</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <h3 className="mb-3 font-semibold">Paiements ajoutés:</h3>
-              <p className="text-center text-sm text-muted-foreground">
-                Aucun paiement ajouté
-              </p>
-            </div>
-
-            <Button
-              size="lg"
-              className="mt-6 w-full"
-              variant="outline"
-              disabled
-            >
-              Restant: {total.toFixed(2)} €
-            </Button>
-          </Card>
+          </Button>
         </div>
       </div>
     </div>
   );
 };
 
-export default Payment;
+export default PaymentModal;
