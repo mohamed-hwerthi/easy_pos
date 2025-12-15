@@ -1,204 +1,260 @@
-import { useState } from "react";
+// src/pages/Tables.tsx
+import { useState, useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
-import { calculateTableStatus, RestaurantTable } from "@/lib/table";
 import { TableStats } from "@/components/tableStats";
-import { mockTables } from "@/utils/constants/mockTables";
 import { TableHeader } from "@/components/tableHeader";
 import { TableGrid } from "@/components/ui/table-grid";
 import { TableDetailSheet } from "@/components/table-detail-sheets";
-import { Button } from "@/components/ui/button"; // Ajoutez cette importation
-import { ArrowLeft } from "lucide-react"; // Ajoutez cette importation
-import { useNavigate } from "react-router-dom"; // Ajoutez cette importation
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { restaurantTableService } from "@/services/restaurant-table.service";
+import { RestaurantTable } from "@/models/restaurant-table.model";
+import { TableStatus } from "@/models/table-status.model";
+import { TableClient } from "@/models/table-client.model";
 
 const Tables = () => {
-  const navigate = useNavigate(); // Ajoutez cette ligne
-  const [tables, setTables] = useState<RestaurantTable[]>(mockTables);
+  const navigate = useNavigate();
+  const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [selectedTable, setSelectedTable] = useState<RestaurantTable | null>(
     null
   );
   const [sheetOpen, setSheetOpen] = useState(false);
   const [animatingTableId, setAnimatingTableId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleTableClick = (table: RestaurantTable) => {
-    setSelectedTable(table);
-    setSheetOpen(true);
+  // Charger les tables au démarrage
+  useEffect(() => {
+    loadTables();
+  }, []);
+
+  const loadTables = async () => {
+    try {
+      setIsLoading(true);
+      const data = await restaurantTableService.getAll();
+      setTables(data);
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les tables",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleAddTable = (name: string, number: number) => {
-    const newTable: RestaurantTable = {
-      id: `table-${Date.now()}`,
-      name,
-      number,
-      status: "empty",
-      guests: [],
-      qrCode: `${name.toUpperCase().replace(/\s+/g, "-")}-${number
-        .toString()
-        .padStart(3, "0")}`,
-      lastUpdated: new Date(),
-    };
-    setTables((prev) => [...prev, newTable]);
-    toast({
-      title: "Table créée",
-      description: `${name} ${number} ajoutée avec succès`,
-    });
+  const handleTableClick = async (table: RestaurantTable) => {
+    try {
+      // Charger les détails de la table
+      const tableDetails = await restaurantTableService.getById(table.id);
+      setSelectedTable(tableDetails);
+      setSheetOpen(true);
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les détails de la table",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAddTable = async (name: string, number: number) => {
+    try {
+      const newTable = await restaurantTableService.create({
+        tableNumber: `${name} ${number}`,
+        status: TableStatus.FREE,
+        qrCode: `${name.toUpperCase().replace(/\s+/g, "-")}-${number
+          .toString()
+          .padStart(3, "0")}`,
+      });
+
+      setTables((prev) => [...prev, newTable]);
+
+      toast({
+        title: "Table créée",
+        description: `${name} ${number} ajoutée avec succès`,
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer la table",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleReorder = (newTables: RestaurantTable[]) => {
     setTables(newTables);
+    // Note: Vous pourriez vouloir sauvegarder l'ordre dans le backend
   };
 
-  const handleGuestPaymentChange = (
+  const handleGuestPaymentChange = async (
     tableId: string,
-    guestId: string,
-    paid: boolean
+    clientId: string,
+    paymentAmount: number,
+    method: string
   ) => {
-    setTables((prev) =>
-      prev.map((table) => {
-        if (table.id === tableId) {
-          const updatedGuests = table.guests.map((guest) =>
-            guest.id === guestId ? { ...guest, paid } : guest
-          );
-          const updatedTable = {
-            ...table,
-            guests: updatedGuests,
-            status: calculateTableStatus(updatedGuests),
-            lastUpdated: new Date(),
-          };
-          setSelectedTable(updatedTable);
-          return updatedTable;
-        }
-        return table;
-      })
-    );
+    try {
+      // Ajouter le paiement
+      await restaurantTableService.addPaymentToClient(clientId, {
+        clientId,
+        amount: paymentAmount,
+        method,
+        paidAt: new Date().toISOString(),
+      });
 
-    setAnimatingTableId(tableId);
-    setTimeout(() => setAnimatingTableId(null), 500);
+      // Mettre à jour le client
+      await restaurantTableService.updateClient(clientId, {
+        remainingAmount: 0, // À adapter selon votre logique
+      });
 
-    toast({
-      title: paid ? "Paiement enregistré" : "Paiement annulé",
-      description: `${selectedTable?.name} ${selectedTable?.number} mise à jour`,
-    });
+      // Recharger la table
+      const updatedTable = await restaurantTableService.getById(tableId);
+      setSelectedTable(updatedTable);
+
+      // Mettre à jour la liste
+      setTables((prev) =>
+        prev.map((t) => (t.id === tableId ? updatedTable : t))
+      );
+
+      setAnimatingTableId(tableId);
+      setTimeout(() => setAnimatingTableId(null), 500);
+
+      toast({
+        title: "Paiement enregistré",
+        description: "Le paiement a été enregistré avec succès",
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'enregistrer le paiement",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleMarkAllPaid = (tableId: string) => {
-    setTables((prev) =>
-      prev.map((table) => {
-        if (table.id === tableId) {
-          const updatedGuests = table.guests.map((guest) => ({
-            ...guest,
-            paid: true,
-          }));
-          const updatedTable = {
-            ...table,
-            guests: updatedGuests,
-            status: "paid" as const,
-            lastUpdated: new Date(),
-          };
-          setSelectedTable(updatedTable);
-          return updatedTable;
-        }
-        return table;
-      })
-    );
+  const handleMarkAllPaid = async (tableId: string) => {
+    try {
+      // Récupérer les clients de la table
+      const clients = await restaurantTableService.getClientsByTable(tableId);
 
-    setAnimatingTableId(tableId);
-    setTimeout(() => setAnimatingTableId(null), 500);
+      // Marquer chaque client comme payé
+      for (const client of clients) {
+        await restaurantTableService.markClientAsPaid(client.id);
+      }
 
-    toast({
-      title: "Table payée",
-      description: `${selectedTable?.name} ${selectedTable?.number} - tous les clients ont payé`,
-    });
+      // Mettre à jour la table
+      const updatedTable = await restaurantTableService.update(tableId, {
+        status: TableStatus.PAID,
+      });
 
-    setTimeout(() => setSheetOpen(false), 300);
+      setSelectedTable(updatedTable);
+      setTables((prev) =>
+        prev.map((t) => (t.id === tableId ? updatedTable : t))
+      );
+
+      setAnimatingTableId(tableId);
+      setTimeout(() => setAnimatingTableId(null), 500);
+
+      toast({
+        title: "Table payée",
+        description: "Tous les clients ont été marqués comme payés",
+      });
+
+      setTimeout(() => setSheetOpen(false), 300);
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de marquer la table comme payée",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleClearTable = (tableId: string) => {
-    setTables((prev) =>
-      prev.map((table) => {
-        if (table.id === tableId) {
-          const updatedTable = {
-            ...table,
-            guests: [],
-            status: "empty" as const,
-            lastUpdated: new Date(),
-          };
-          setSelectedTable(updatedTable);
-          return updatedTable;
-        }
-        return table;
-      })
-    );
+  const handleClearTable = async (tableId: string) => {
+    try {
+      const updatedTable = await restaurantTableService.clearTable(tableId);
 
-    setAnimatingTableId(tableId);
-    setTimeout(() => setAnimatingTableId(null), 500);
+      setSelectedTable(updatedTable);
+      setTables((prev) =>
+        prev.map((t) => (t.id === tableId ? updatedTable : t))
+      );
 
-    toast({
-      title: "Table libérée",
-      description: `${selectedTable?.name} ${selectedTable?.number} est maintenant disponible`,
-    });
+      setAnimatingTableId(tableId);
+      setTimeout(() => setAnimatingTableId(null), 500);
 
-    setTimeout(() => setSheetOpen(false), 300);
+      toast({
+        title: "Table libérée",
+        description: "La table a été libérée avec succès",
+      });
+
+      setTimeout(() => setSheetOpen(false), 300);
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de libérer la table",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleAddGuest = (tableId: string) => {
-    setTables((prev) =>
-      prev.map((table) => {
-        if (table.id === tableId) {
-          const newGuest = {
-            id: `guest-${Date.now()}-${Math.random()
-              .toString(36)
-              .substr(2, 9)}`,
-            name: `Client ${table.guests.length + 1}`,
-            amountDue: 25,
-            paid: false,
-          };
-          const updatedGuests = [...table.guests, newGuest];
-          const paidCount = updatedGuests.filter((g) => g.paid).length;
-          const newStatus =
-            updatedGuests.length === 0
-              ? ("empty" as const)
-              : paidCount === updatedGuests.length
-              ? ("paid" as const)
-              : paidCount === 0
-              ? ("unpaid" as const)
-              : ("partial" as const);
+  const handleAddGuest = async (tableId: string) => {
+    try {
+      const newClient: Omit<TableClient, "id"> = {
+        name: `Client ${Date.now().toString().slice(-4)}`,
+        tableId,
+        amountDue: 25, // Montant par défaut
+        remainingAmount: 25,
+      };
 
-          const updatedTable = {
-            ...table,
-            guests: updatedGuests,
-            status: newStatus,
-            lastUpdated: new Date(),
-          };
-          setSelectedTable(updatedTable);
-          return updatedTable;
-        }
-        return table;
-      })
-    );
+      const createdClient = await restaurantTableService.addClientToTable(
+        tableId,
+        newClient
+      );
 
-    setAnimatingTableId(tableId);
-    setTimeout(() => setAnimatingTableId(null), 500);
+      // Mettre à jour la table
+      const updatedTable = await restaurantTableService.update(tableId, {
+        status: TableStatus.OCCUPIED,
+      });
 
-    toast({
-      title: "Client ajouté",
-      description: `Nouveau client ajouté à la table`,
-    });
+      setSelectedTable(updatedTable);
+      setTables((prev) =>
+        prev.map((t) => (t.id === tableId ? updatedTable : t))
+      );
+
+      setAnimatingTableId(tableId);
+      setTimeout(() => setAnimatingTableId(null), 500);
+
+      toast({
+        title: "Client ajouté",
+        description: "Nouveau client ajouté à la table",
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'ajouter le client",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleTableFound = (table: RestaurantTable) => {
-    setSelectedTable(table);
-    setSheetOpen(true);
-  };
-
-  // Fonction pour naviguer vers le POS
   const handleGoToPOS = () => {
     navigate("/pos");
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container py-6 max-w-7xl mx-auto px-4 sm:px-6">
-        {/* Ajout du bouton de retour au POS */}
+        {/* Bouton de retour */}
         <div className="mb-6">
           <Button
             variant="outline"
