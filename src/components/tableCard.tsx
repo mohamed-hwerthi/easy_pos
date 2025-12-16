@@ -1,146 +1,328 @@
-import { Check, Clock, Users, Circle, AlertCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { calculateTotalDue, RestaurantTable, TableStatus } from "@/lib/table";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+// src/pages/Tables.tsx
+import { useState, useEffect } from "react";
+import { toast } from "@/hooks/use-toast";
+import { TableStats } from "@/components/tableStats";
+import { TableHeader } from "@/components/tableHeader";
+import { TableGrid } from "@/components/ui/table-grid";
+import { TableDetailSheet } from "@/components/table-detail-sheets";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { restaurantTableService } from "@/services/restaurant-table.service";
+import { RestaurantTable } from "@/models/restaurant-table.model";
+import { TableStatus } from "@/models/table-status.model";
 
-interface TableCardProps {
-  table: RestaurantTable;
-  onClick: (table: RestaurantTable) => void;
-  isAnimating?: boolean;
-}
+const Tables = () => {
+  const navigate = useNavigate();
+  const [tables, setTables] = useState<RestaurantTable[]>([]);
+  const [selectedTable, setSelectedTable] = useState<RestaurantTable | null>(
+    null
+  );
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [animatingTableId, setAnimatingTableId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-const statusConfig: Record<
-  TableStatus,
-  {
-    icon: typeof Check;
-    label: string;
-    bgClass: string;
-    textClass: string;
-    borderClass: string;
-  }
-> = {
-  paid: {
-    icon: Check,
-    label: "Payée",
-    bgClass: "bg-status-paid-bg",
-    textClass: "text-status-paid",
-    borderClass: "border-status-paid/30",
-  },
-  unpaid: {
-    icon: Clock,
-    label: "Non payée",
-    bgClass: "bg-status-unpaid-bg",
-    textClass: "text-status-unpaid",
-    borderClass: "border-status-unpaid/30",
-  },
-  partial: {
-    icon: AlertCircle,
-    label: "Partiel",
-    bgClass: "bg-status-partial-bg",
-    textClass: "text-status-partial",
-    borderClass: "border-status-partial/30",
-  },
-  empty: {
-    icon: Circle,
-    label: "Libre",
-    bgClass: "bg-status-empty-bg",
-    textClass: "text-status-empty",
-    borderClass: "border-status-empty/30",
-  },
-};
+  // Charger les tables au démarrage
+  useEffect(() => {
+    loadTables();
+  }, []);
 
-export function TableCard({ table, onClick, isAnimating }: TableCardProps) {
-  const config = statusConfig[table.status];
-  const StatusIcon = config.icon;
-  const totalDue = calculateTotalDue(table.guests);
-  const paidCount = table.guests.filter((g) => g.paid).length;
-
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: table.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+  const loadTables = async () => {
+    try {
+      setIsLoading(true);
+      const data = await restaurantTableService.getAll();
+      setTables(data);
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les tables",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      onClick={() => onClick(table)}
-      className={cn(
-        "w-full p-4 rounded-lg border-2 bg-card shadow-card transition-all duration-200 cursor-grab",
-        "hover:shadow-card-hover hover:scale-[1.02] active:scale-[0.98]",
-        "focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2",
-        config.borderClass,
-        isAnimating && "animate-status-change",
-        isDragging && "opacity-50 cursor-grabbing shadow-lg scale-105 z-50"
-      )}
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div className="text-left">
-          <h3 className="font-semibold text-foreground text-lg">
-            {table.name} {table.number}
-          </h3>
-          {table.guests.length > 0 && (
-            <div className="flex items-center gap-1.5 text-muted-foreground text-sm mt-0.5">
-              <Users className="w-3.5 h-3.5" />
-              <span>
-                {table.guests.length}{" "}
-                {table.guests.length > 1 ? "clients" : "client"}
-              </span>
-              {table.status === "partial" && (
-                <span className="text-status-partial">
-                  ({paidCount}/{table.guests.length} payé)
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-        <div
-          className={cn(
-            "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
-            config.bgClass,
-            config.textClass
-          )}
-        >
-          <StatusIcon className="w-3.5 h-3.5" />
-          <span>{config.label}</span>
-        </div>
+  const handleTableClick = async (table: RestaurantTable) => {
+    try {
+      // Charger les détails de la table
+      const tableDetails = await restaurantTableService.getById(table.id);
+      setSelectedTable(tableDetails);
+      setSheetOpen(true);
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les détails de la table",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAddTable = async (name: string, number: number) => {
+    try {
+      const newTable = await restaurantTableService.create({
+        tableNumber: `${name} ${number}`,
+        status: TableStatus.FREE,
+        qrCode: `${name.toUpperCase().replace(/\s+/g, "-")}-${number
+          .toString()
+          .padStart(3, "0")}`,
+        remainingAmount: 0,
+        clientIds: [],
+      });
+
+      setTables((prev) => [...prev, newTable]);
+
+      toast({
+        title: "Table créée",
+        description: `${name} ${number} ajoutée avec succès`,
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer la table",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleTablesUpdate = (newTables: RestaurantTable[]) => {
+    setTables(newTables);
+    // Note: Vous pourriez vouloir sauvegarder l'ordre dans le backend
+  };
+
+  const handleGuestPaymentChange = async (
+    tableId: string,
+    clientId: string,
+    paymentAmount: number,
+    method: string
+  ) => {
+    try {
+      // Ajouter le paiement
+      await restaurantTableService.addPaymentToClient(clientId, {
+        clientId,
+        amount: paymentAmount,
+        method,
+        paidAt: new Date().toISOString(),
+      });
+
+      // Mettre à jour le client
+      await restaurantTableService.updateClient(clientId, {
+        remainingAmount: 0, // À adapter selon votre logique
+      });
+
+      // Recharger la table
+      const updatedTable = await restaurantTableService.getById(tableId);
+      setSelectedTable(updatedTable);
+
+      // Mettre à jour la liste
+      setTables((prev) =>
+        prev.map((t) => (t.id === tableId ? updatedTable : t))
+      );
+
+      setAnimatingTableId(tableId);
+      setTimeout(() => setAnimatingTableId(null), 500);
+
+      toast({
+        title: "Paiement enregistré",
+        description: "Le paiement a été enregistré avec succès",
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'enregistrer le paiement",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMarkAllPaid = async (tableId: string) => {
+    try {
+      // Récupérer les clients de la table
+      const clients = await restaurantTableService.getClientsByTable(tableId);
+
+      // Marquer chaque client comme payé
+      for (const client of clients) {
+        await restaurantTableService.markClientAsPaid(client.id);
+      }
+
+      // Mettre à jour la table
+      const updatedTable = await restaurantTableService.update(tableId, {
+        status: TableStatus.PAID,
+      });
+
+      setSelectedTable(updatedTable);
+      setTables((prev) =>
+        prev.map((t) => (t.id === tableId ? updatedTable : t))
+      );
+
+      setAnimatingTableId(tableId);
+      setTimeout(() => setAnimatingTableId(null), 500);
+
+      toast({
+        title: "Table payée",
+        description: "Tous les clients ont été marqués comme payés",
+      });
+
+      setTimeout(() => setSheetOpen(false), 300);
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de marquer la table comme payée",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleClearTable = async (tableId: string) => {
+    try {
+      const updatedTable = await restaurantTableService.clearTable(tableId);
+
+      setSelectedTable(updatedTable);
+      setTables((prev) =>
+        prev.map((t) => (t.id === tableId ? updatedTable : t))
+      );
+
+      setAnimatingTableId(tableId);
+      setTimeout(() => setAnimatingTableId(null), 500);
+
+      toast({
+        title: "Table libérée",
+        description: "La table a été libérée avec succès",
+      });
+
+      setTimeout(() => setSheetOpen(false), 300);
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de libérer la table",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAddGuest = async (tableId: string) => {
+    try {
+      const newClient = {
+        name: `Client ${Date.now().toString().slice(-4)}`,
+        tableId,
+        amountDue: 25,
+        remainingAmount: 25,
+      };
+
+      const createdClient = await restaurantTableService.addClientToTable(
+        tableId,
+        newClient
+      );
+
+      // Mettre à jour la table
+      const updatedTable = await restaurantTableService.getById(tableId);
+      setSelectedTable(updatedTable);
+      setTables((prev) =>
+        prev.map((t) => (t.id === tableId ? updatedTable : t))
+      );
+
+      setAnimatingTableId(tableId);
+      setTimeout(() => setAnimatingTableId(null), 500);
+
+      toast({
+        title: "Client ajouté",
+        description: "Nouveau client ajouté à la table",
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'ajouter le client",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleOccupyTable = async (table: RestaurantTable) => {
+    try {
+      const updatedTable = await restaurantTableService.occupyTable(table.id);
+
+      // Mettre à jour la table sélectionnée
+      setSelectedTable(updatedTable);
+
+      // Mettre à jour la liste des tables
+      setTables((prev) =>
+        prev.map((t) => (t.id === table.id ? updatedTable : t))
+      );
+
+      setAnimatingTableId(table.id);
+      setTimeout(() => setAnimatingTableId(null), 500);
+
+      toast({
+        title: "Table occupée",
+        description: "La table a été marquée comme occupée",
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'occuper la table",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleGoToPOS = () => {
+    navigate("/pos");
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
+    );
+  }
 
-      {(table.status === "unpaid" || table.status === "partial") &&
-        totalDue > 0 && (
-          <div className="text-left pt-2 border-t border-border">
-            <span className="text-xs text-muted-foreground">Montant dû</span>
-            <p className="text-xl font-bold text-foreground">
-              {totalDue.toFixed(2)} €
-            </p>
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container py-6 max-w-7xl mx-auto px-4 sm:px-6">
+        {/* Bouton de retour */}
+        <div className="mb-6">
+          <Button
+            variant="outline"
+            onClick={handleGoToPOS}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Retour au POS
+          </Button>
+        </div>
+
+        <TableHeader onAddTable={handleAddTable} />
+
+        <div className="space-y-6">
+          <TableStats tables={tables} />
+
+          <div className="pt-2">
+            <h2 className="text-lg font-semibold text-foreground mb-4">
+              Toutes les tables
+            </h2>
+            <TableGrid
+              tables={tables}
+              onTableClick={handleTableClick}
+              onTablesUpdate={handleTablesUpdate}
+              animatingTableId={animatingTableId}
+            />
           </div>
-        )}
-
-      {table.status === "empty" && (
-        <div className="text-left pt-2 border-t border-border">
-          <span className="text-sm text-muted-foreground">
-            Table disponible
-          </span>
         </div>
-      )}
 
-      {table.status === "paid" && (
-        <div className="text-left pt-2 border-t border-border">
-          <span className="text-sm text-status-paid font-medium">✓ Réglée</span>
-        </div>
-      )}
+        <TableDetailSheet
+          table={selectedTable}
+          open={sheetOpen}
+          onOpenChange={setSheetOpen}
+          onGuestPaymentChange={handleGuestPaymentChange}
+          onMarkAllPaid={handleMarkAllPaid}
+          onClearTable={handleClearTable}
+          onAddGuest={handleAddGuest}
+          onOccupyTable={handleOccupyTable}
+        />
+      </div>
     </div>
   );
-}
+};
+
+export default Tables;

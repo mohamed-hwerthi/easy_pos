@@ -1,4 +1,6 @@
-import { calculateTotalDue, RestaurantTable } from "@/lib/table";
+// src/components/TableStats.tsx
+import { RestaurantTable } from "@/models/restaurant-table.model";
+import { TableStatus } from "@/models/table-status.model";
 import { Check, Clock, Circle, Euro, AlertCircle } from "lucide-react";
 
 interface TableStatsProps {
@@ -6,14 +8,16 @@ interface TableStatsProps {
 }
 
 export function TableStats({ tables }: TableStatsProps) {
-  const paidCount = tables.filter((t) => t.status === "paid").length;
-  const unpaidCount = tables.filter((t) => t.status === "unpaid").length;
-  const partialCount = tables.filter((t) => t.status === "partial").length;
-  const emptyCount = tables.filter((t) => t.status === "empty").length;
-  const totalDue = tables.reduce(
-    (sum, t) => sum + calculateTotalDue(t.guests),
-    0
-  );
+  const paidCount = tables.filter((t) => t.status === TableStatus.PAID).length;
+  const unpaidCount = tables.filter(
+    (t) => t.status === TableStatus.OCCUPIED
+  ).length;
+  const partialCount = tables.filter(
+    (t) => t.status === TableStatus.PARTIALLY_PAID
+  ).length;
+  const emptyCount = tables.filter((t) => t.status === TableStatus.FREE).length;
+
+  const totalDue = tables.reduce((sum, t) => sum + (t.remainingAmount || 0), 0);
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">

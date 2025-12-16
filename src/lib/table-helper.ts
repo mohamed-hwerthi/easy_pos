@@ -13,13 +13,6 @@ export const calculateTableStatus = (clients: TableClient[]) => {
   return "PARTIALLY_PAID";
 };
 
-export const calculateTotalDue = (clients: TableClient[]) => {
-  return clients.reduce(
-    (sum, client) => sum + (client.remainingAmount || 0),
-    0
-  );
-};
-
 export const calculateTotalAmount = (clients: TableClient[]) => {
   return clients.reduce((sum, client) => sum + (client.amountDue || 0), 0);
 };

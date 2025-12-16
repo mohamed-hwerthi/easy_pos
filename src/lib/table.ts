@@ -7,16 +7,6 @@ export interface Guest {
   paid: boolean;
 }
 
-export interface RestaurantTable {
-  id: string;
-  name: string;
-  number: number;
-  status: TableStatus;
-  guests: Guest[];
-  qrCode: string;
-  lastUpdated: Date;
-}
-
 export function calculateTableStatus(guests: Guest[]): TableStatus {
   if (guests.length === 0) return "empty";
   const paidCount = guests.filter((g) => g.paid).length;

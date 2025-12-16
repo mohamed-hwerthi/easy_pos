@@ -15,6 +15,11 @@ export const restaurantTableService = {
     return data;
   },
 
+  occupyTable: async (tableId: string): Promise<RestaurantTable> => {
+    const response = await apiClient.patch(`/tables/${tableId}/occupy`);
+    return response.data; // updated table
+  },
+
   /**
    * Create a new restaurant table.
    * @param table - Table data without ID
@@ -170,5 +175,12 @@ export const restaurantTableService = {
   }> {
     const { data } = await apiClient.get("/tables/statistics");
     return data;
+  },
+
+  async removeClientFromTable(
+    tableId: string,
+    clientId: string
+  ): Promise<void> {
+    await this.removeClient(clientId);
   },
 };

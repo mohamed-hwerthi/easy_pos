@@ -67,6 +67,8 @@ const Tables = () => {
         qrCode: `${name.toUpperCase().replace(/\s+/g, "-")}-${number
           .toString()
           .padStart(3, "0")}`,
+        remainingAmount: 0,
+        clientIds: [],
       });
 
       setTables((prev) => [...prev, newTable]);
@@ -84,7 +86,7 @@ const Tables = () => {
     }
   };
 
-  const handleReorder = (newTables: RestaurantTable[]) => {
+  const handleTablesUpdate = (newTables: RestaurantTable[]) => {
     setTables(newTables);
     // Note: Vous pourriez vouloir sauvegarder l'ordre dans le backend
   };
@@ -204,7 +206,7 @@ const Tables = () => {
       const newClient: Omit<TableClient, "id"> = {
         name: `Client ${Date.now().toString().slice(-4)}`,
         tableId,
-        amountDue: 25, // Montant par défaut
+        amountDue: 25,
         remainingAmount: 25,
       };
 
@@ -214,10 +216,7 @@ const Tables = () => {
       );
 
       // Mettre à jour la table
-      const updatedTable = await restaurantTableService.update(tableId, {
-        status: TableStatus.OCCUPIED,
-      });
-
+      const updatedTable = await restaurantTableService.getById(tableId);
       setSelectedTable(updatedTable);
       setTables((prev) =>
         prev.map((t) => (t.id === tableId ? updatedTable : t))
@@ -234,6 +233,34 @@ const Tables = () => {
       toast({
         title: "Erreur",
         description: "Impossible d'ajouter le client",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleOccupyTable = async (table: RestaurantTable) => {
+    try {
+      const updatedTable = await restaurantTableService.occupyTable(table.id);
+
+      // Mettre à jour la table sélectionnée
+      setSelectedTable(updatedTable);
+
+      // Mettre à jour la liste des tables
+      setTables((prev) =>
+        prev.map((t) => (t.id === table.id ? updatedTable : t))
+      );
+
+      setAnimatingTableId(table.id);
+      setTimeout(() => setAnimatingTableId(null), 500);
+
+      toast({
+        title: "Table occupée",
+        description: "La table a été marquée comme occupée",
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'occuper la table",
         variant: "destructive",
       });
     }
@@ -278,7 +305,7 @@ const Tables = () => {
             <TableGrid
               tables={tables}
               onTableClick={handleTableClick}
-              onReorder={handleReorder}
+              onTablesUpdate={handleTablesUpdate}
               animatingTableId={animatingTableId}
             />
           </div>
@@ -292,6 +319,7 @@ const Tables = () => {
           onMarkAllPaid={handleMarkAllPaid}
           onClearTable={handleClearTable}
           onAddGuest={handleAddGuest}
+          onOccupyTable={handleOccupyTable}
         />
       </div>
     </div>
