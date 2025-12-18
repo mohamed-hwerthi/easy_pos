@@ -15,4 +15,6 @@ export interface ClientOrder {
   cashierSessionId?: string;
   cashReceived?: number;
   changeGiven?: number;
+  tableId: string;
+  clientId: string;
 }

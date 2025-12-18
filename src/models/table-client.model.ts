@@ -5,4 +5,5 @@ export interface TableClient {
   amountDue?: number;
   remainingAmount?: number;
   paymentIds?: string[];
+  hasOrders: boolean;
 }

@@ -15,7 +15,7 @@ export const clientOrderService = {
 
   /**
    * Place a POS order with cashier session information
-   * @param order - Order object with POS-specific fields
+   * @param order - Order object with POS-specific fieldsy
    * @param cashierSessionId - UUID of the current cashier session
    * @param cashReceived - Amount of cash received from customer
    * @param changeGiven - Change given back to customer
@@ -111,6 +111,29 @@ export const clientOrderService = {
       `/client/orders/session/${sessionId}`,
       { params }
     );
+    return data;
+  },
+
+  /**
+   * Get orders by table and cashier session
+   * @param tableId - UUID of the restaurant table
+   * @param cashierSessionId - UUID of the cashier session
+   * @returns Array of ClientOrder objects
+   */
+  async getOrdersByTableAndSession(
+    tableId: string,
+    cashierSessionId: string
+  ): Promise<ClientOrder[]> {
+    const { data } = await apiClient.get(
+      "/client/orders/by-table-and-session",
+      {
+        params: {
+          tableId,
+          cashierSessionId,
+        },
+      }
+    );
+
     return data;
   },
 };

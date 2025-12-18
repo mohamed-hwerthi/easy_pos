@@ -1,4 +1,3 @@
-// src/pages/Tables.tsx
 import { useState, useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
 import { TableStats } from "@/components/tableStats";
@@ -12,9 +11,11 @@ import { restaurantTableService } from "@/services/restaurant-table.service";
 import { RestaurantTable } from "@/models/restaurant-table.model";
 import { TableStatus } from "@/models/table-status.model";
 import { TableClient } from "@/models/table-client.model";
+import { ClientOrder } from "@/models/client/client-order.model";
 
 const Tables = () => {
   const navigate = useNavigate();
+
   const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [selectedTable, setSelectedTable] = useState<RestaurantTable | null>(
     null
@@ -23,7 +24,6 @@ const Tables = () => {
   const [animatingTableId, setAnimatingTableId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Charger les tables au démarrage
   useEffect(() => {
     loadTables();
   }, []);
@@ -33,7 +33,7 @@ const Tables = () => {
       setIsLoading(true);
       const data = await restaurantTableService.getAll();
       setTables(data);
-    } catch (error) {
+    } catch {
       toast({
         title: "Erreur",
         description: "Impossible de charger les tables",
@@ -46,11 +46,10 @@ const Tables = () => {
 
   const handleTableClick = async (table: RestaurantTable) => {
     try {
-      // Charger les détails de la table
       const tableDetails = await restaurantTableService.getById(table.id);
       setSelectedTable(tableDetails);
       setSheetOpen(true);
-    } catch (error) {
+    } catch {
       toast({
         title: "Erreur",
         description: "Impossible de charger les détails de la table",
@@ -69,6 +68,7 @@ const Tables = () => {
           .padStart(3, "0")}`,
         remainingAmount: 0,
         clientIds: [],
+        totalAmount: 0,
       });
 
       setTables((prev) => [...prev, newTable]);
@@ -77,7 +77,7 @@ const Tables = () => {
         title: "Table créée",
         description: `${name} ${number} ajoutée avec succès`,
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Erreur",
         description: "Impossible de créer la table",
@@ -88,7 +88,6 @@ const Tables = () => {
 
   const handleTablesUpdate = (newTables: RestaurantTable[]) => {
     setTables(newTables);
-    // Note: Vous pourriez vouloir sauvegarder l'ordre dans le backend
   };
 
   const handleGuestPaymentChange = async (
@@ -98,7 +97,6 @@ const Tables = () => {
     method: string
   ) => {
     try {
-      // Ajouter le paiement
       await restaurantTableService.addPaymentToClient(clientId, {
         clientId,
         amount: paymentAmount,
@@ -106,16 +104,13 @@ const Tables = () => {
         paidAt: new Date().toISOString(),
       });
 
-      // Mettre à jour le client
       await restaurantTableService.updateClient(clientId, {
-        remainingAmount: 0, // À adapter selon votre logique
+        remainingAmount: 0,
       });
 
-      // Recharger la table
       const updatedTable = await restaurantTableService.getById(tableId);
-      setSelectedTable(updatedTable);
 
-      // Mettre à jour la liste
+      setSelectedTable(updatedTable);
       setTables((prev) =>
         prev.map((t) => (t.id === tableId ? updatedTable : t))
       );
@@ -127,7 +122,7 @@ const Tables = () => {
         title: "Paiement enregistré",
         description: "Le paiement a été enregistré avec succès",
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Erreur",
         description: "Impossible d'enregistrer le paiement",
@@ -136,17 +131,46 @@ const Tables = () => {
     }
   };
 
+  const handleAddOrderToTable = async (tableId: string, order: ClientOrder) => {
+    try {
+      const session = localStorage.getItem("currentSession");
+      if (!session) {
+        throw new Error("No active cashier session");
+      }
+
+      const { id: cashierSessionId } = JSON.parse(session);
+
+      const updatedTable = await restaurantTableService.getById(tableId);
+
+      setSelectedTable(updatedTable);
+      setTables((prev) =>
+        prev.map((t) => (t.id === tableId ? updatedTable : t))
+      );
+
+      setAnimatingTableId(tableId);
+      setTimeout(() => setAnimatingTableId(null), 500);
+
+      toast({
+        title: "Commande ajoutée",
+        description: "La commande a été ajoutée à la table avec succès",
+      });
+    } catch {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'ajouter la commande à la table",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleMarkAllPaid = async (tableId: string) => {
     try {
-      // Récupérer les clients de la table
       const clients = await restaurantTableService.getClientsByTable(tableId);
 
-      // Marquer chaque client comme payé
       for (const client of clients) {
         await restaurantTableService.markClientAsPaid(client.id);
       }
 
-      // Mettre à jour la table
       const updatedTable = await restaurantTableService.update(tableId, {
         status: TableStatus.PAID,
       });
@@ -165,7 +189,7 @@ const Tables = () => {
       });
 
       setTimeout(() => setSheetOpen(false), 300);
-    } catch (error) {
+    } catch {
       toast({
         title: "Erreur",
         description: "Impossible de marquer la table comme payée",
@@ -192,7 +216,7 @@ const Tables = () => {
       });
 
       setTimeout(() => setSheetOpen(false), 300);
-    } catch (error) {
+    } catch {
       toast({
         title: "Erreur",
         description: "Impossible de libérer la table",
@@ -208,28 +232,23 @@ const Tables = () => {
         tableId,
         amountDue: 25,
         remainingAmount: 25,
+        hasOrders: false,
       };
 
-      const createdClient = await restaurantTableService.addClientToTable(
-        tableId,
-        newClient
-      );
+      await restaurantTableService.addClientToTable(tableId, newClient);
 
-      // Mettre à jour la table
       const updatedTable = await restaurantTableService.getById(tableId);
+
       setSelectedTable(updatedTable);
       setTables((prev) =>
         prev.map((t) => (t.id === tableId ? updatedTable : t))
       );
 
-      setAnimatingTableId(tableId);
-      setTimeout(() => setAnimatingTableId(null), 500);
-
       toast({
         title: "Client ajouté",
         description: "Nouveau client ajouté à la table",
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Erreur",
         description: "Impossible d'ajouter le client",
@@ -242,22 +261,16 @@ const Tables = () => {
     try {
       const updatedTable = await restaurantTableService.occupyTable(table.id);
 
-      // Mettre à jour la table sélectionnée
       setSelectedTable(updatedTable);
-
-      // Mettre à jour la liste des tables
       setTables((prev) =>
         prev.map((t) => (t.id === table.id ? updatedTable : t))
       );
-
-      setAnimatingTableId(table.id);
-      setTimeout(() => setAnimatingTableId(null), 500);
 
       toast({
         title: "Table occupée",
         description: "La table a été marquée comme occupée",
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Erreur",
         description: "Impossible d'occuper la table",
@@ -266,9 +279,7 @@ const Tables = () => {
     }
   };
 
-  const handleGoToPOS = () => {
-    navigate("/pos");
-  };
+  const handleGoToPOS = () => navigate("/pos");
 
   if (isLoading) {
     return (
@@ -281,35 +292,25 @@ const Tables = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container py-6 max-w-7xl mx-auto px-4 sm:px-6">
-        {/* Bouton de retour */}
         <div className="mb-6">
-          <Button
-            variant="outline"
-            onClick={handleGoToPOS}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
+          <Button variant="outline" onClick={handleGoToPOS}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
             Retour au POS
           </Button>
         </div>
 
         <TableHeader onAddTable={handleAddTable} />
+        <TableStats tables={tables} />
 
-        <div className="space-y-6">
-          <TableStats tables={tables} />
+        {/* Ajout d'un espace ici */}
+        <div className="mb-8" />
 
-          <div className="pt-2">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Toutes les tables
-            </h2>
-            <TableGrid
-              tables={tables}
-              onTableClick={handleTableClick}
-              onTablesUpdate={handleTablesUpdate}
-              animatingTableId={animatingTableId}
-            />
-          </div>
-        </div>
+        <TableGrid
+          tables={tables}
+          onTableClick={handleTableClick}
+          onTablesUpdate={handleTablesUpdate}
+          animatingTableId={animatingTableId}
+        />
 
         <TableDetailSheet
           table={selectedTable}
@@ -320,6 +321,7 @@ const Tables = () => {
           onClearTable={handleClearTable}
           onAddGuest={handleAddGuest}
           onOccupyTable={handleOccupyTable}
+          onAddOrderToTable={handleAddOrderToTable}
         />
       </div>
     </div>

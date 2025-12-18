@@ -69,10 +69,10 @@ export async function createPOSOrder(
     "cashierSessionId" | "cashReceived" | "changeGiven" | "source"
   > = {
     orderItems: cartItems,
-    customer,
-    deliveryAddress,
     total,
     subTotal,
+    tableId: "",
+    clientId: "",
   };
 
   // Place the order using the POS-specific method

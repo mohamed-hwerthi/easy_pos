@@ -8,4 +8,5 @@ export interface RestaurantTable {
   remainingAmount?: number;
   clientIds?: string[];
   orderIds?: string[];
+  totalAmount: number;
 }
